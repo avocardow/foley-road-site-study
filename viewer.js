@@ -770,7 +770,7 @@ try {
     viewpointBar.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => stepInside(views[Number(button.dataset.index)])));
   };
   // Eye-level view inside a concept: a wide lens, a near clipping plane, and orbiting around a point
-  // just ahead, so dragging looks around. Top view and 3D view restore the site camera.
+  // just ahead, so dragging looks around. Reset view restores the site camera.
   // Site-scale markers (boundary line, easement labels) draw through walls, so hide them inside.
   const siteMarkers = [boundaryGroup, easementGroup];
   let hiddenMarkers = null;
@@ -842,19 +842,7 @@ try {
   toggle("bushfire-toggle", constraints.bushfire);
   document.getElementById("elevation-range").innerHTML = `${data.elevationRangeM[0].toFixed(1)}–${data.elevationRangeM[1].toFixed(1)} <span class="unit">m</span>`;
   fit();
-  const homeTarget = new THREE.Vector3(0, (data.elevationRangeM[0] + data.elevationRangeM[1]) / 2, 0);
-  const homeOffset = new THREE.Vector3(93, 120, 165).sub(homeTarget);
-  // Pull back on portrait screens so the whole parcel stays in frame.
-  const goHome = () => {
-    leaveInside();
-    camera.up.set(0, 1, 0);
-    controls.maxPolarAngle = Math.PI * 0.48;
-    controls.enableRotate = true;
-    controls.target.copy(homeTarget);
-    camera.position.copy(homeTarget).addScaledVector(homeOffset, Math.max(1, 0.78 / camera.aspect));
-    controls.update();
-  };
-  goHome();
+  const groundLevel = (data.elevationRangeM[0] + data.elevationRangeM[1]) / 2;
   // Each photo stays in the same map coordinates. With both enabled, the wide image
   // blends over the detail image so any remaining registration error is visible.
   photos.forEach((photo) => {
@@ -870,21 +858,20 @@ try {
   const xs = parcelPoints.map(([x]) => x), zs = parcelPoints.map(([, z]) => z);
   const parcelCenter = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2];
   const parcelSpan = [Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)];
-  // North-up plan view. A tiny southward offset keeps OrbitControls' azimuth defined.
-  const goTop = () => {
+  // The starting view: looking straight down, north up, framed on the lot. The camera sits a hair
+  // south of the target so north is up on screen; orbiting, rotating, and zooming all stay free.
+  const resetView = () => {
     leaveInside();
     const distance = Math.max(parcelSpan[1], parcelSpan[0] / camera.aspect) * 1.3 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
-    controls.target.set(parcelCenter[0], homeTarget.y, parcelCenter[1]);
-    camera.up.set(0, 0, -1);
-    controls.maxPolarAngle = 0.0001;
-    controls.enableRotate = false;
-    camera.position.set(parcelCenter[0], homeTarget.y + distance, parcelCenter[1] + distance * 1e-3);
+    camera.up.set(0, 1, 0);
+    controls.maxPolarAngle = Math.PI * 0.48;
+    controls.enableRotate = true;
+    controls.target.set(parcelCenter[0], groundLevel, parcelCenter[1]);
+    camera.position.set(parcelCenter[0], groundLevel + distance, parcelCenter[1] + distance * 1e-3);
     controls.update();
   };
-  document.getElementById("reset").addEventListener("click", goHome);
-  document.getElementById("top-view").addEventListener("click", goTop);
-  // Open on the north-up plan; the 3D view is one click away.
-  goTop();
+  document.getElementById("reset").addEventListener("click", resetView);
+  resetView();
   window.addEventListener("resize", fit);
   loading.hidden = true;
   renderer.setAnimationLoop(() => {
