@@ -5,6 +5,9 @@ import data from "./site-data.json";
 const canvas = document.querySelector("#model");
 const loading = document.querySelector("#loading");
 const error = document.querySelector("#error");
+const scaleLine = document.querySelector("#scale-line");
+const scaleLabel = document.querySelector("#scale-label");
+const northNeedle = document.querySelector("#north-needle");
 const scene = new THREE.Scene();
 scene.background = new THREE.Color("#151c1a");
 
@@ -14,7 +17,7 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 
-const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 1200);
+const camera = new THREE.PerspectiveCamera(38, 1, 1, 3000);
 camera.up.set(0, 1, 0);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -35,10 +38,12 @@ const terrainGroup = new THREE.Group();
 const contoursGroup = new THREE.Group();
 const clearingGroup = new THREE.Group();
 const treesGroup = new THREE.Group();
-const drivewayGroup = new THREE.Group();
-const accessGroup = new THREE.Group();
+const padGroup = new THREE.Group();
+const roadGroup = new THREE.Group();
+const easementGroup = new THREE.Group();
 const aerialGroup = new THREE.Group();
-scene.add(terrainGroup, contoursGroup, clearingGroup, treesGroup, drivewayGroup, accessGroup, aerialGroup);
+const boundaryGroup = new THREE.Group();
+scene.add(terrainGroup, contoursGroup, clearingGroup, treesGroup, padGroup, roadGroup, easementGroup, aerialGroup, boundaryGroup);
 
 function makeTerrain(data) {
   const position = new Float32Array(data.points.length * 3);
@@ -60,13 +65,7 @@ function makeTerrain(data) {
   geometry.setIndex(data.faces.flat());
   geometry.computeVertexNormals();
   const surface = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.96, metalness: 0, side: THREE.DoubleSide }));
-  surface.castShadow = true;
-  surface.receiveShadow = true;
   terrainGroup.add(surface);
-
-  const boundary = data.boundary.map(([x, y, z]) => new THREE.Vector3(x, y + 0.12, z));
-  const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(boundary), new THREE.LineBasicMaterial({ color: "#f2d18f", linewidth: 2 }));
-  terrainGroup.add(outline);
 
   const baseY = low - 2.4;
   const wallPositions = [];
@@ -84,6 +83,33 @@ function makeTerrain(data) {
   bottomGeometry.setIndex([0, 1, 2]);
   bottomGeometry.computeVertexNormals();
   terrainGroup.add(new THREE.Mesh(bottomGeometry, new THREE.MeshStandardMaterial({ color: "#373a34", roughness: 1, side: THREE.DoubleSide })));
+  return geometry;
+}
+
+function makeParcelBoundary(data, sampleHeight) {
+  const points = [];
+  data.boundary.forEach(([ax, , az], index) => {
+    const [bx, , bz] = data.boundary[(index + 1) % data.boundary.length];
+    const steps = Math.ceil(Math.hypot(bx - ax, bz - az));
+    for (let step = 0; step < steps; step++) {
+      const t = step / steps;
+      const x = ax + (bx - ax) * t, z = az + (bz - az) * t;
+      points.push(new THREE.Vector3(x, sampleHeight(x, z) + 0.42, z));
+    }
+  });
+  const curve = new THREE.CatmullRomCurve3(points, true, "catmullrom", 0);
+  const geometry = new THREE.TubeGeometry(curve, points.length, 0.22, 6, true);
+  const outline = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: "#59d9cc", toneMapped: false, depthTest: false, depthWrite: false }));
+  outline.renderOrder = 20;
+  boundaryGroup.add(outline);
+  const markerGeometry = new THREE.SphereGeometry(0.48, 12, 8);
+  const markerMaterial = new THREE.MeshBasicMaterial({ color: "#59d9cc", toneMapped: false, depthTest: false, depthWrite: false });
+  data.boundary.forEach(([x, , z]) => {
+    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+    marker.position.set(x, sampleHeight(x, z) + 0.42, z);
+    marker.renderOrder = 20;
+    boundaryGroup.add(marker);
+  });
 }
 
 function makeContours(data) {
@@ -150,6 +176,122 @@ function terrainSampler(data) {
   };
 }
 
+// Ground around the lot comes from a 2 m DEM grid. The skirt that carries the draped
+// photos is built as rings offset from the lot boundary, so it joins the lot terrain exactly.
+function makeGround(data, sampleHeight) {
+  const corners = data.boundary;
+  const { spacingM, columns, rows, originX, originZ, heightsCm } = data.ground;
+  const bytes = Uint8Array.from(atob(heightsCm), (char) => char.charCodeAt(0));
+  const heights = new Int16Array(bytes.buffer);
+  const demHeight = (x, z) => {
+    const column = THREE.MathUtils.clamp((x - originX) / spacingM, 0, columns - 1.001);
+    const row = THREE.MathUtils.clamp((z - originZ) / spacingM, 0, rows - 1.001);
+    const c = Math.floor(column), r = Math.floor(row), fc = column - c, fr = row - r;
+    const at = (rr, cc) => heights[rr * columns + cc] / 100;
+    return (at(r, c) * (1 - fc) + at(r, c + 1) * fc) * (1 - fr) + (at(r + 1, c) * (1 - fc) + at(r + 1, c + 1) * fc) * fr;
+  };
+  const height = (x, z) => insidePolygon(x, z, corners) ? sampleHeight(x, z) : demHeight(x, z);
+
+  const orientation = Math.sign(corners.reduce((sum, [x, , z], i) => {
+    const [nextX, , nextZ] = corners[(i + 1) % corners.length];
+    return sum + x * nextZ - nextX * z;
+  }, 0));
+  const edges = corners.map((a, index) => {
+    const b = corners[(index + 1) % corners.length];
+    const dx = b[0] - a[0], dz = b[2] - a[2];
+    const lengthSquared = dx * dx + dz * dz, length = Math.sqrt(lengthSquared);
+    // Terrain vertices that lie on this edge, ordered from a to b.
+    const profile = data.points
+      .map((point) => ({ point, t: ((point[0] - a[0]) * dx + (point[2] - a[2]) * dz) / lengthSquared, offset: Math.abs((point[0] - a[0]) * dz - (point[2] - a[2]) * dx) / length }))
+      .filter(({ t, offset }) => offset < 2e-3 && t > -1e-4 && t < 1 + 1e-4)
+      .sort((p, q) => p.t - q.t);
+    return { outward: [orientation * dz / length, -orientation * dx / length], profile };
+  });
+  const base = [];
+  edges.forEach((edge, index) => {
+    edge.profile.forEach(({ point }) => base.push({ point, direction: edge.outward }));
+    const next = edges[(index + 1) % edges.length].outward;
+    const start = Math.atan2(edge.outward[1], edge.outward[0]);
+    const turn = Math.atan2(edge.outward[0] * next[1] - edge.outward[1] * next[0], edge.outward[0] * next[0] + edge.outward[1] * next[1]);
+    const cornerPoint = edge.profile.at(-1).point;
+    for (let step = 1; step < 36; step++) {
+      const angle = start + turn * step / 36;
+      base.push({ point: cornerPoint, direction: [Math.cos(angle), Math.sin(angle)] });
+    }
+  });
+  const skirt = (reach) => {
+    const offsets = [0];
+    while (offsets.at(-1) < reach) {
+      const last = offsets.at(-1);
+      offsets.push(last + (last < 20 ? 1 : last < 60 ? 2 : last < 160 ? 4 : 8));
+    }
+    const positions = [];
+    offsets.forEach((offset, ring) => {
+      for (const { point: [x, y, z], direction: [dx, dz] } of base) {
+        const px = x + dx * offset, pz = z + dz * offset;
+        positions.push(px, ring === 0 ? y : demHeight(px, pz), pz);
+      }
+    });
+    const indices = [];
+    for (let ring = 0; ring < offsets.length - 1; ring++) for (let i = 0; i < base.length; i++) {
+      const a = ring * base.length + i, b = ring * base.length + (i + 1) % base.length;
+      indices.push(a, b, b + base.length, a, b + base.length, a + base.length);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    return geometry;
+  };
+  return { height, skirt };
+}
+
+// Fill a polygon as a mesh that follows the ground, cut into small cells.
+function drapePolygon(polygon, heightAt, lift, step = 1.5) {
+  const bounds = polygon.reduce((b, [x, z]) => ({ minX: Math.min(b.minX, x), maxX: Math.max(b.maxX, x), minZ: Math.min(b.minZ, z), maxZ: Math.max(b.maxZ, z) }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+  const clip = (points, axis, limit, greater) => {
+    const result = [];
+    for (let i = 0; i < points.length; i++) {
+      const current = points[i], previous = points[(i + points.length - 1) % points.length];
+      const inside = (point) => greater ? point[axis] >= limit : point[axis] <= limit;
+      if (inside(current) !== inside(previous)) {
+        const t = (limit - previous[axis]) / (current[axis] - previous[axis]);
+        result.push([previous[0] + t * (current[0] - previous[0]), previous[1] + t * (current[1] - previous[1])]);
+      }
+      if (inside(current)) result.push(current);
+    }
+    return result;
+  };
+  const positions = [];
+  const startX = Math.floor(bounds.minX / step) * step;
+  const startZ = Math.floor(bounds.minZ / step) * step;
+  for (let x = startX; x < bounds.maxX; x += step) for (let z = startZ; z < bounds.maxZ; z += step) {
+    let cell = polygon;
+    cell = clip(cell, 0, x, true); cell = clip(cell, 0, x + step, false);
+    cell = clip(cell, 1, z, true); cell = clip(cell, 1, z + step, false);
+    if (cell.length < 3) continue;
+    const vertices = cell.map(([px, pz]) => [px, heightAt(px, pz) + lift, pz]);
+    for (let i = 1; i < vertices.length - 1; i++) positions.push(...vertices[0], ...vertices[i], ...vertices[i + 1]);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// Outline points that follow the ground, subdivided so lines do not cut through slopes.
+function drapeOutline(polygon, heightAt, lift) {
+  const points = [];
+  polygon.forEach(([ax, az], i) => {
+    const [bx, bz] = polygon[(i + 1) % polygon.length];
+    const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az)));
+    for (let k = 0; k < steps; k++) {
+      const x = ax + (bx - ax) * k / steps, z = az + (bz - az) * k / steps;
+      points.push(new THREE.Vector3(x, heightAt(x, z) + lift, z));
+    }
+  });
+  return new THREE.BufferGeometry().setFromPoints(points);
+}
+
 function makeClearing(data, sampleHeight) {
   let polygon = data.clearedArea.map(([x, , z]) => [x, z]);
   const parcel = data.boundary.map(([x, , z]) => [x, z]);
@@ -172,39 +314,8 @@ function makeClearing(data, sampleHeight) {
     }
     polygon = clipped;
   }
-  const bounds = polygon.reduce((b, [x, z]) => ({ minX: Math.min(b.minX, x), maxX: Math.max(b.maxX, x), minZ: Math.min(b.minZ, z), maxZ: Math.max(b.maxZ, z) }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
-  const clip = (points, axis, limit, greater) => {
-    const result = [];
-    for (let i = 0; i < points.length; i++) {
-      const current = points[i], previous = points[(i + points.length - 1) % points.length];
-      const inside = (point) => greater ? point[axis] >= limit : point[axis] <= limit;
-      if (inside(current) !== inside(previous)) {
-        const t = (limit - previous[axis]) / (current[axis] - previous[axis]);
-        result.push([previous[0] + t * (current[0] - previous[0]), previous[1] + t * (current[1] - previous[1])]);
-      }
-      if (inside(current)) result.push(current);
-    }
-    return result;
-  };
-  const positions = [];
-  const step = 1.5;
-  const startX = Math.floor(bounds.minX / step) * step;
-  const startZ = Math.floor(bounds.minZ / step) * step;
-  for (let x = startX; x < bounds.maxX; x += step) for (let z = startZ; z < bounds.maxZ; z += step) {
-    let cell = polygon;
-    cell = clip(cell, 0, x, true); cell = clip(cell, 0, x + step, false);
-    cell = clip(cell, 1, z, true); cell = clip(cell, 1, z + step, false);
-    if (cell.length < 3) continue;
-    const heights = cell.map(([px, pz]) => sampleHeight(px, pz));
-    if (heights.some((height) => height === null)) continue;
-    const vertices = cell.map(([px, pz], i) => [px, heights[i] + 0.12, pz]);
-    for (let i = 1; i < vertices.length - 1; i++) positions.push(...vertices[0], ...vertices[i], ...vertices[i + 1]);
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
-  clearingGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#a9a274", transparent: true, opacity: 0.62, roughness: 1, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 })));
-  const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(polygon.map(([x, z]) => new THREE.Vector3(x, (sampleHeight(x, z) ?? 0) + 0.2, z))), new THREE.LineDashedMaterial({ color: "#f3d39c", dashSize: 2.1, gapSize: 1.1, transparent: true, opacity: 0.95 }));
+  clearingGroup.add(new THREE.Mesh(drapePolygon(polygon, sampleHeight, 0.12), new THREE.MeshStandardMaterial({ color: "#a9a274", transparent: true, opacity: 0.62, roughness: 1, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 })));
+  const outline = new THREE.LineLoop(drapeOutline(polygon, sampleHeight, 0.2), new THREE.LineDashedMaterial({ color: "#f3d39c", dashSize: 2.1, gapSize: 1.1, transparent: true, opacity: 0.95 }));
   outline.computeLineDistances();
   clearingGroup.add(outline);
 }
@@ -219,9 +330,10 @@ function insidePolygon(x, z, polygon) {
   return inside;
 }
 
-function makeTrees(data) {
-  // Tree positions are illustrative: densely fill the lot around the mapped clearing,
-  // with a tighter band at the clearing edge to make the tree line easy to read.
+function makeTrees(data, sampleHeight) {
+  // Individual trees are illustrative. The photo shows unbroken canopy apart from the
+  // traced clearing, so trees line the clearing edge and the lot edges, then an even
+  // jittered fill closes the canopy. Crowns stop at the clearing edge.
   let seed = 353650;
   const random = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -231,29 +343,54 @@ function makeTrees(data) {
     minX: Math.min(b.minX, x), maxX: Math.max(b.maxX, x),
     minZ: Math.min(b.minZ, z), maxZ: Math.max(b.maxZ, z),
   }), { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+  const clearing = data.clearedArea;
+  const clearingDistance = (x, z) => Math.min(...clearing.map(([ax, , az], i) => {
+    const [bx, , bz] = clearing[(i + 1) % clearing.length];
+    const dx = bx - ax, dz = bz - az;
+    const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
+    return Math.hypot(x - (ax + t * dx), z - (az + t * dz));
+  }));
   const trees = [];
-  let attempts = 0;
-  while (trees.length < 360 && attempts < 9000) {
-    attempts++;
-    const x = bounds.minX + random() * (bounds.maxX - bounds.minX);
-    const z = bounds.minZ + random() * (bounds.maxZ - bounds.minZ);
-    if (!insidePolygon(x, z, data.boundary)) continue;
-    const clearingEdge = Math.min(...data.clearedArea.map(([ax, , az], i) => {
-      const [bx, , bz] = data.clearedArea[(i + 1) % data.clearedArea.length];
-      const dx = bx - ax, dz = bz - az;
-      const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
-      return Math.hypot(x - (ax + t * dx), z - (az + t * dz));
-    }));
-    if (insidePolygon(x, z, data.clearedArea) || insidePolygon(x, z, data.driveway) || clearingEdge < 3.2) continue;
-    const nearest = data.points.reduce((best, point) => {
-      const distance = (point[0] - x) ** 2 + (point[2] - z) ** 2;
-      return !best || distance < best.distance ? { point, distance } : best;
-    }, null).point;
-    const height = nearest[1];
-    trees.push({ x, z, y: height, tone: random() });
+  const crown = () => {
+    const radius = 2.4 + random() * 1.3;
+    const depth = radius * (0.82 + random() * 0.3);
+    return { radius, depth, reach: Math.max(radius, depth) };
+  };
+  const addTree = (x, z, { radius, depth, reach } = crown()) => {
+    if (!insidePolygon(x, z, data.boundary) || insidePolygon(x, z, clearing) || insidePolygon(x, z, data.pad)) return;
+    if (clearingDistance(x, z) < reach * 0.95) return;
+    if (trees.some((tree) => Math.hypot(tree.x - x, tree.z - z) < 2.2)) return;
+    trees.push({ x, z, y: sampleHeight(x, z), radius, depth, tone: random() });
+  };
+
+  // Walk a closed outline, adding a tree every `spacing` metres at a chosen offset from it.
+  const lineOutline = (outline, spacing, offsetFor) => {
+    const orientation = Math.sign(outline.reduce((sum, [x, , z], i) => {
+      const [nextX, , nextZ] = outline[(i + 1) % outline.length];
+      return sum + x * nextZ - nextX * z;
+    }, 0));
+    let untilNext = 0;
+    outline.forEach(([ax, , az], i) => {
+      const [bx, , bz] = outline[(i + 1) % outline.length];
+      const dx = bx - ax, dz = bz - az, length = Math.hypot(dx, dz);
+      const outwardX = orientation * dz / length, outwardZ = -orientation * dx / length;
+      let along = untilNext;
+      for (; along < length; along += spacing) {
+        const size = crown();
+        const offset = offsetFor(size);
+        addTree(ax + dx * along / length + outwardX * offset, az + dz * along / length + outwardZ * offset, size);
+      }
+      untilNext = along - length;
+    });
+  };
+  lineOutline(clearing, 3.2, (size) => size.reach);
+  lineOutline(data.boundary, 3.4, () => -1.2 - random() * 0.8);
+  const spacing = 4.2;
+  for (let x = bounds.minX; x <= bounds.maxX; x += spacing) for (let z = bounds.minZ; z <= bounds.maxZ; z += spacing) {
+    addTree(x + (random() - 0.5) * 2.6, z + (random() - 0.5) * 2.6);
   }
 
-  const trunkGeometry = new THREE.CylinderGeometry(0.24, 0.38, 8, 5);
+  const trunkGeometry = new THREE.CylinderGeometry(0.24, 0.38, 1, 5);
   const trunkMaterial = new THREE.MeshStandardMaterial({ color: "#554537", roughness: 1 });
   const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, trees.length);
   const crownGeometry = new THREE.IcosahedronGeometry(1, 1);
@@ -268,12 +405,11 @@ function makeTrees(data) {
   trees.forEach((tree, index) => {
     const height = 7.2 + random() * 2.4;
     position.set(tree.x, tree.y + height / 2, tree.z);
-    scale.set(1, 1, 1);
+    scale.set(1, height, 1);
     matrix.compose(position, rotation, scale);
     trunks.setMatrixAt(index, matrix);
-    const radius = 2.4 + random() * 1.3;
     position.set(tree.x, tree.y + height + 1.5 + random() * 0.7, tree.z);
-    scale.set(radius, 3.0 + random() * 1.5, radius * (0.82 + random() * 0.3));
+    scale.set(tree.radius, 3.0 + random() * 1.5, tree.depth);
     matrix.compose(position, rotation, scale);
     crowns.setMatrixAt(index, matrix);
     color.set(palette[Math.floor(tree.tone * palette.length)]);
@@ -284,9 +420,9 @@ function makeTrees(data) {
   treesGroup.add(trunks, crowns);
 }
 
-function makeDriveway(data, sampleHeight) {
-  const corners = data.driveway;
-  const columns = 12, rows = 6;
+function makePad(data, sampleHeight) {
+  const corners = data.pad;
+  const columns = 6, rows = 6;
   const positions = [];
   const pointAt = (u, v) => {
     const x = (1 - v) * ((1 - u) * corners[0][0] + u * corners[1][0]) + v * ((1 - u) * corners[3][0] + u * corners[2][0]);
@@ -302,140 +438,128 @@ function makeDriveway(data, sampleHeight) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.computeVertexNormals();
-  drivewayGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#aeb0ac", roughness: 0.94, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 })));
+  padGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#aeb0ac", roughness: 0.94, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 })));
 }
 
-function makeRoadContext(data, sampleHeight) {
-  const points = data.boundary;
-  const signedArea = points.reduce((sum, [x, , z], i) => {
-    const [nx, , nz] = points[(i + 1) % points.length];
-    return sum + x * nz - nx * z;
-  }, 0);
-  const orientation = Math.sign(signedArea);
-  const ribbon = (a, b, from, to, material, elevationOffset = 0.25) => {
-    const dx = b[0] - a[0], dz = b[2] - a[2];
-    const length = Math.hypot(dx, dz);
-    const outwardX = orientation * dz / length, outwardZ = -orientation * dx / length;
-    const positions = [];
-    const steps = Math.ceil(length / 5);
-    for (let i = 0; i < steps; i++) {
-      const t0 = i / steps, t1 = (i + 1) / steps;
-      const section = (t, offset) => {
-        const x = a[0] + dx * t + outwardX * offset;
-        const z = a[2] + dz * t + outwardZ * offset;
-        const y = a[1] + (b[1] - a[1]) * t + elevationOffset;
-        return [x, y, z];
-      };
-      const p0 = section(t0, from), p1 = section(t1, from), p2 = section(t1, to), p3 = section(t0, to);
-      positions.push(...p0, ...p1, ...p2, ...p0, ...p2, ...p3);
-    }
+// Roads follow the carriageway edges traced from the parcel aerial and sit on the DEM.
+function makeRoadContext(data, groundHeight) {
+  // Subdivided across the width too, so wide carriageways follow camber and cross-fall.
+  const strip = (inner, outer, material, lift) => {
+    const positions = [], indices = [];
+    const across = Math.max(1, Math.ceil(Math.hypot(outer[0][0] - inner[0][0], outer[0][1] - inner[0][1]) / 1.5));
+    inner.forEach(([x, z], i) => {
+      const [ox, oz] = outer[i];
+      for (let k = 0; k <= across; k++) {
+        const px = x + (ox - x) * k / across, pz = z + (oz - z) * k / across;
+        positions.push(px, groundHeight(px, pz) + lift, pz);
+      }
+      if (i === 0) return;
+      for (let k = 0; k < across; k++) {
+        const a = (i - 1) * (across + 1) + k, b = i * (across + 1) + k;
+        indices.push(a, a + 1, b + 1, a, b + 1, b);
+      }
+    });
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
     geometry.computeVertexNormals();
-    accessGroup.add(new THREE.Mesh(geometry, material));
+    roadGroup.add(new THREE.Mesh(geometry, material));
   };
-
-  const asphalt = new THREE.MeshStandardMaterial({ color: "#454a48", roughness: 0.98, side: THREE.DoubleSide });
-  const footpath = new THREE.MeshStandardMaterial({ color: "#b8b6aa", roughness: 1, side: THREE.DoubleSide });
-  // Boundary edge 1 follows Foley Road; edge 2 follows Nambour Connection Road.
-  const foleyStart = points[1], foleyEnd = points[2];
-  ribbon(foleyStart, foleyEnd, 2.8, 9.6, asphalt);
-  ribbon(foleyStart, foleyEnd, 0.25, 1.75, footpath, 0.32);
-  const highwayStart = points[2], highwayEnd = points[0];
-  ribbon(highwayStart, highwayEnd, 3.2, 18.2, asphalt);
-
-  // The existing apron sits close to Foley Road. This short private access crosses
-  // the roadside path and joins the apron at its road-facing end.
-  const foleyDx = foleyEnd[0] - foleyStart[0], foleyDz = foleyEnd[2] - foleyStart[2];
-  const foleyLengthSquared = foleyDx ** 2 + foleyDz ** 2;
-  const apronCenter = data.driveway.reduce((center, [x, , z]) => [center[0] + x / data.driveway.length, center[1] + z / data.driveway.length], [0, 0]);
-  const entryT = THREE.MathUtils.clamp(((apronCenter[0] - foleyStart[0]) * foleyDx + (apronCenter[1] - foleyStart[2]) * foleyDz) / foleyLengthSquared, 0, 1);
-  const entryX = foleyStart[0] + foleyDx * entryT, entryZ = foleyStart[2] + foleyDz * entryT;
-  const foleyOutwardX = orientation * foleyDz / Math.sqrt(foleyLengthSquared);
-  const foleyOutwardZ = -orientation * foleyDx / Math.sqrt(foleyLengthSquared);
-  const entryPoint = [entryX, 0, entryZ];
-  const apronJoin = data.driveway.reduce((nearest, point) => Math.hypot(point[0] - entryX, point[2] - entryZ) < Math.hypot(nearest[0] - entryX, nearest[2] - entryZ) ? point : nearest);
-  const accessPath = [
-    [entryX + foleyOutwardX * 6.2, 0, entryZ + foleyOutwardZ * 6.2],
-    entryPoint,
-    [apronJoin[0], 0, apronJoin[2]],
-  ];
-  const halfWidth = 1.55;
-  const verts = [];
-  for (let i = 0; i < accessPath.length - 1; i++) {
-    const a = accessPath[i], b = accessPath[i + 1];
-    const dx = b[0] - a[0], dz = b[2] - a[2], length = Math.hypot(dx, dz);
-    const nx = -dz / length * halfWidth, nz = dx / length * halfWidth;
-    const corners = [[a[0] + nx, a[2] + nz], [b[0] + nx, b[2] + nz], [b[0] - nx, b[2] - nz], [a[0] - nx, a[2] - nz]];
-    for (let j = 1; j < corners.length - 1; j++) {
-      for (const [x, z] of [corners[0], corners[j], corners[j + 1]]) verts.push(x, sampleHeight(x, z) + 0.32, z);
-    }
+  const surface = { roughness: 0.98, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 };
+  const asphalt = new THREE.MeshStandardMaterial({ color: "#454a48", ...surface });
+  const verge = new THREE.MeshStandardMaterial({ color: "#a89878", ...surface });
+  for (const road of data.roads) {
+    strip(road.nearEdge, road.farEdge, asphalt, 0.25);
+    if (road.farVerge) strip(road.farEdge, road.farVerge.outerEdge, verge, 0.2);
   }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-  geometry.computeVertexNormals();
-  drivewayGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#898c87", roughness: 0.95, side: THREE.DoubleSide })));
+
+  // Short access from the Foley Road carriageway to the pad at the road boundary.
+  const foley = data.roads.find((road) => road.name === "Foley Road");
+  const padCenter = data.pad.reduce((center, [x, , z]) => [center[0] + x / data.pad.length, center[1] + z / data.pad.length], [0, 0]);
+  const distance = ([x, z]) => Math.hypot(x - padCenter[0], z - padCenter[1]);
+  const entry = foley.nearEdge.reduce((nearest, point) => distance(point) < distance(nearest) ? point : nearest);
+  const dx = padCenter[0] - entry[0], dz = padCenter[1] - entry[1], length = Math.hypot(dx, dz);
+  const nx = -dz / length * 1.55, nz = dx / length * 1.55;
+  const lane = [[entry[0] + nx, entry[1] + nz], [padCenter[0] + nx, padCenter[1] + nz], [padCenter[0] - nx, padCenter[1] - nz], [entry[0] - nx, entry[1] - nz]];
+  padGroup.add(new THREE.Mesh(drapePolygon(lane, groundHeight, 0.16, 0.75), new THREE.MeshStandardMaterial({ color: "#898c87", roughness: 0.95, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 })));
 }
 
-function makeAerialReference({ file, data, vertices, homography, label }) {
-  const width = 1384, height = 952, cropY = 15, visibleHeight = height - cropY * 2;
-  const targets = data.boundary.map(([x, , z]) => [x, z]);
-  let mapPixel;
-  if (homography) {
-    const [[a, b, c], [d, e, f], [g, h, i]] = homography;
-    mapPixel = (u, v) => {
-      const divisor = g * u + h * v + i;
-      return [(a * u + b * v + c) / divisor, (d * u + e * v + f) / divisor];
-    };
-  } else {
-    const [p0, p1, p2] = vertices;
-    const determinant = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (p1[1] - p0[1]);
-    const affine = (values) => {
-      const [v0, v1, v2] = values;
-      const a = ((v1 - v0) * (p2[1] - p0[1]) - (v2 - v0) * (p1[1] - p0[1])) / determinant;
-      const b = ((p1[0] - p0[0]) * (v2 - v0) - (p2[0] - p0[0]) * (v1 - v0)) / determinant;
-      return (x, y) => v0 + a * (x - p0[0]) + b * (y - p0[1]);
-    };
-    const xAt = affine(targets.map(([x]) => x));
-    const zAt = affine(targets.map(([, z]) => z));
-    mapPixel = (x, y) => [xAt(x, y), zAt(x, y)];
+// Registered easements from the cadastre, lettered as on the survey plan.
+function makeEasements(data, groundHeight) {
+  const fill = new THREE.MeshBasicMaterial({ color: "#f08a3c", transparent: true, opacity: 0.38, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+  const line = new THREE.LineBasicMaterial({ color: "#ffb070" });
+  for (const easement of data.easements) {
+    easementGroup.add(new THREE.Mesh(drapePolygon(easement.polygon, groundHeight, 0.25, 0.5), fill));
+    easementGroup.add(new THREE.LineLoop(drapeOutline(easement.polygon, groundHeight, 0.3), line));
+    const label = document.createElement("canvas");
+    label.width = label.height = 64;
+    const context = label.getContext("2d");
+    context.fillStyle = "#f08a3c";
+    context.beginPath();
+    context.arc(32, 32, 28, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#1b1712";
+    context.font = "700 36px sans-serif";
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(easement.label, 32, 34);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(label), depthTest: false }));
+    const [cx, cz] = easement.polygon.reduce((sum, [x, z]) => [sum[0] + x / easement.polygon.length, sum[1] + z / easement.polygon.length], [0, 0]);
+    sprite.position.set(cx, groundHeight(cx, cz) + 6, cz);
+    sprite.scale.set(4, 4, 1);
+    sprite.renderOrder = 21;
+    easementGroup.add(sprite);
   }
-  const y = Math.max(data.elevationRangeM[1] + 12, 48);
-  const positions = [], uvs = [];
-  const columns = homography ? 24 : 1, rows = homography ? 16 : 1;
-  for (let row = 0; row <= rows; row++) for (let column = 0; column <= columns; column++) {
-    const u = column / columns, v = row / rows;
-    const px = u * width, py = cropY + v * visibleHeight;
-    const [x, z] = mapPixel(px, py);
-    positions.push(x, y, z);
-    uvs.push(u, 1 - py / height);
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-  const indices = [];
-  for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
-    const topLeft = row * (columns + 1) + column;
-    const topRight = topLeft + 1;
-    const bottomLeft = topLeft + columns + 1;
-    const bottomRight = bottomLeft + 1;
-    indices.push(topLeft, topRight, bottomRight, topLeft, bottomRight, bottomLeft);
-  }
-  geometry.setIndex(indices);
-  const group = new THREE.Group();
-  group.name = label;
-  group.visible = false;
+}
+
+const photoWidth = 1384, photoHeight = 952, photoCropY = 15;
+
+function applyProjective(matrix, x, y) {
+  const point = new THREE.Vector3(x, y, 1).applyMatrix3(matrix);
+  return [point.x / point.z, point.y / point.z];
+}
+
+// Pixel-to-site transform fixed by three corresponding points.
+function affineFromPairs(pixels, sites) {
+  const rows = (points) => new THREE.Matrix3().set(...points.map(([x]) => x), ...points.map(([, y]) => y), 1, 1, 1);
+  return rows(sites).multiply(rows(pixels).invert());
+}
+
+// Photos are draped onto the terrain and the surrounding ground, so they line up with
+// the model from any viewpoint rather than floating above it.
+function makeAerialPhoto({ file, toSite, terrainGeometry, ground, buttonId }) {
+  const toPixel = toSite.clone().invert();
+  const footprint = [[0, photoCropY], [photoWidth, photoCropY], [photoWidth, photoHeight - photoCropY], [0, photoHeight - photoCropY]].map(([u, v]) => applyProjective(toSite, u, v));
+  const reach = Math.max(...footprint.map(([x, z]) => Math.hypot(x, z)));
   const texture = new THREE.TextureLoader().load(file);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  group.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.52, depthWrite: false, side: THREE.DoubleSide })));
-  const boundaryLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(targets.map(([x, z]) => new THREE.Vector3(x, y + 0.25, z))), new THREE.LineDashedMaterial({ color: "#f2d18f", dashSize: 3, gapSize: 1.8 }));
-  boundaryLine.computeLineDistances();
-  group.add(boundaryLine);
+  const material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide, toneMapped: false, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+  const minV = (photoCropY / photoHeight).toFixed(6), maxV = (1 - photoCropY / photoHeight).toFixed(6);
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace("#include <map_fragment>", `if (vMapUv.x < 0.0 || vMapUv.x > 1.0 || vMapUv.y < ${minV} || vMapUv.y > ${maxV}) discard;\n#include <map_fragment>`);
+  };
+  const drape = (source) => {
+    const geometry = new THREE.BufferGeometry();
+    const position = source.getAttribute("position");
+    const uvs = new Float32Array(position.count * 2);
+    for (let i = 0; i < position.count; i++) {
+      const [u, v] = applyProjective(toPixel, position.getX(i), position.getZ(i));
+      uvs[i * 2] = u / photoWidth;
+      uvs[i * 2 + 1] = 1 - v / photoHeight;
+    }
+    geometry.setAttribute("position", position);
+    geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+    geometry.setIndex(source.getIndex());
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.renderOrder = buttonId === "aerial-closeup-toggle" ? 1 : 2;
+    return mesh;
+  };
+  const group = new THREE.Group();
+  group.visible = false;
+  group.add(drape(terrainGeometry), drape(ground.skirt(reach)));
   aerialGroup.add(group);
-  const world = [[0, cropY], [width, cropY], [width, height - cropY], [0, height - cropY]].map(([px, py]) => mapPixel(px, py));
-  const xs = world.map(([x]) => x), zs = world.map(([, z]) => z);
-  return { group, label, buttonId: label === "Parcel aerial" ? "aerial-closeup-toggle" : "aerial-area-toggle", center: [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2], width: Math.max(...xs) - Math.min(...xs), height: Math.max(...zs) - Math.min(...zs) };
+  return { group, buttonId, material };
 }
 
 function toggle(buttonId, group) {
@@ -443,8 +567,28 @@ function toggle(buttonId, group) {
   button.addEventListener("click", () => {
     group.visible = !group.visible;
     button.setAttribute("aria-pressed", String(group.visible));
-    button.lastElementChild.textContent = group.visible ? "✓" : "";
   });
+}
+
+const niceLengths = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000];
+const screenRight = new THREE.Vector3();
+const screenUp = new THREE.Vector3();
+const screenBack = new THREE.Vector3();
+
+// Perspective scale varies with depth, so the bar measures ground at the orbit target.
+function updateOverlays() {
+  const height = canvas.clientHeight;
+  const distance = camera.position.distanceTo(controls.target);
+  const pixelsPerMetre = height / (2 * distance * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  const metres = niceLengths.find((length) => length * pixelsPerMetre >= 45) ?? niceLengths.at(-1);
+  scaleLine.style.width = `${Math.round(metres * pixelsPerMetre)}px`;
+  scaleLabel.textContent = `≈ ${metres} m`;
+
+  // North is world -Z. Compare it with the screen axes flattened onto the ground, so the
+  // needle shows compass heading rather than a foreshortened ground direction.
+  camera.matrixWorld.extractBasis(screenRight, screenUp, screenBack);
+  const angle = Math.atan2(-screenRight.z, -screenUp.z / Math.hypot(screenUp.x, screenUp.z));
+  northNeedle.style.transform = `rotate(${angle}rad)`;
 }
 
 function fit() {
@@ -456,83 +600,76 @@ function fit() {
 
 try {
   const sampleHeight = terrainSampler(data);
-  makeTerrain(data);
+  const ground = makeGround(data, sampleHeight);
+  const terrainGeometry = makeTerrain(data);
+  makeParcelBoundary(data, sampleHeight);
   makeContours(data);
   makeClearing(data, sampleHeight);
-  makeTrees(data);
-  makeDriveway(data, sampleHeight);
-  makeRoadContext(data, sampleHeight);
-  const references = [
-    makeAerialReference({ file: "./aerial-reference-close.jpg", data, vertices: [[308, 416], [523, 648], [1039, 400]], label: "Parcel aerial" }),
-    // Wide-to-detail RANSAC ties (34 inliers) composed with the detail's parcel transform.
-    makeAerialReference({ file: "./aerial-reference-area.jpg", data, homography: [[-0.2290748474, 0.2884579112, -53.1378137481], [-0.29094921, -0.2297106469, 389.0934423236], [-0.0000026198, 0.0002069447, 1]], label: "Area aerial" }),
+  makeTrees(data, sampleHeight);
+  makePad(data, sampleHeight);
+  makeRoadContext(data, ground.height);
+  makeEasements(data, ground.height);
+  const parcelPoints = data.boundary.map(([x, , z]) => [x, z]);
+  const photos = [
+    makeAerialPhoto({ file: "./aerial-reference-close.jpg", toSite: affineFromPairs([[308, 416], [523, 648], [1039, 400]], parcelPoints), terrainGeometry, ground, buttonId: "aerial-closeup-toggle" }),
+    // Wide-to-detail homography fitted to shared features around the parcel and roads,
+    // composed with the detail image's cadastral-corner transform.
+    makeAerialPhoto({ file: "./aerial-reference-area.jpg", toSite: new THREE.Matrix3().set(-0.220430864656, 0.268799193112, -42.600149699886, -0.263561787439, -0.207578209753, 351.969402402826, -0.000025487548, 0.000110981898, 1), terrainGeometry, ground, buttonId: "aerial-area-toggle" }),
   ];
   toggle("terrain-toggle", terrainGroup);
   toggle("contour-toggle", contoursGroup);
   toggle("clearing-toggle", clearingGroup);
   toggle("trees-toggle", treesGroup);
-  toggle("driveway-toggle", drivewayGroup);
-  toggle("road-toggle", accessGroup);
-  document.getElementById("elevation-range").innerHTML = `${data.elevationRangeM[0]}–${data.elevationRangeM[1]} <span class="stat-unit">m</span>`;
-  controls.target.set(0, (data.elevationRangeM[0] + data.elevationRangeM[1]) / 2, 0);
-  camera.position.set(93, 120, 165);
-  controls.update();
-  controls.saveState();
-  let selectedReference = null;
-  let savedView = null;
-  const focusReference = (reference) => {
-    const aspect = camera.aspect;
-    const distance = Math.max(reference.height, reference.width / aspect) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.08;
-    camera.up.set(0, 0, -1);
-    camera.far = Math.max(1200, distance * 3);
-    camera.updateProjectionMatrix();
-    controls.maxDistance = Math.max(430, distance * 1.1);
-    controls.target.set(reference.center[0], (data.elevationRangeM[0] + data.elevationRangeM[1]) / 2, reference.center[1]);
-    camera.position.set(reference.center[0], controls.target.y + distance, reference.center[1]);
+  toggle("pad-toggle", padGroup);
+  toggle("road-toggle", roadGroup);
+  toggle("easement-toggle", easementGroup);
+  toggle("boundary-toggle", boundaryGroup);
+  document.getElementById("elevation-range").innerHTML = `${data.elevationRangeM[0].toFixed(1)}–${data.elevationRangeM[1].toFixed(1)} <span class="unit">m</span>`;
+  fit();
+  const homeTarget = new THREE.Vector3(0, (data.elevationRangeM[0] + data.elevationRangeM[1]) / 2, 0);
+  const homeOffset = new THREE.Vector3(93, 120, 165).sub(homeTarget);
+  // Pull back on portrait screens so the whole parcel stays in frame.
+  const goHome = () => {
+    camera.up.set(0, 1, 0);
+    controls.maxPolarAngle = Math.PI * 0.48;
+    controls.enableRotate = true;
+    controls.target.copy(homeTarget);
+    camera.position.copy(homeTarget).addScaledVector(homeOffset, Math.max(1, 1.2 / camera.aspect));
     controls.update();
   };
-  references.forEach((reference) => {
-    const button = document.getElementById(reference.buttonId);
-    button.addEventListener("click", () => {
-      if (selectedReference === reference) {
-        reference.group.visible = false;
-        button.setAttribute("aria-pressed", "false");
-        button.lastElementChild.textContent = "";
-        selectedReference = null;
-        if (savedView) {
-          camera.position.copy(savedView.position);
-          camera.up.copy(savedView.up);
-          controls.target.copy(savedView.target);
-          controls.maxDistance = savedView.maxDistance;
-          camera.far = savedView.far;
-          camera.updateProjectionMatrix();
-          controls.enableRotate = savedView.enableRotate;
-          controls.update();
-        }
-        savedView = null;
-        return;
-      }
-      if (!selectedReference) savedView = { position: camera.position.clone(), up: camera.up.clone(), target: controls.target.clone(), maxDistance: controls.maxDistance, far: camera.far, enableRotate: controls.enableRotate };
-      references.forEach((candidate) => {
-        candidate.group.visible = candidate === reference;
-        const candidateButton = document.getElementById(candidate.buttonId);
-        candidateButton.setAttribute("aria-pressed", String(candidate === reference));
-        candidateButton.lastElementChild.textContent = candidate === reference ? "✓" : "";
-      });
-      selectedReference = reference;
-      controls.enableRotate = false;
-      focusReference(reference);
+  goHome();
+  // Each photo stays in the same map coordinates. With both enabled, the wide image
+  // blends over the detail image so any remaining registration error is visible.
+  photos.forEach((photo) => {
+    document.getElementById(photo.buttonId).addEventListener("click", () => {
+      photo.group.visible = !photo.group.visible;
+      const button = document.getElementById(photo.buttonId);
+      button.setAttribute("aria-pressed", String(photo.group.visible));
+      const visiblePhotos = photos.filter((candidate) => candidate.group.visible);
+      photos.forEach((candidate) => { candidate.material.opacity = 1; });
+      if (visiblePhotos.length > 1) visiblePhotos.at(-1).material.opacity = 0.5;
     });
   });
-  document.getElementById("reset").addEventListener("click", () => selectedReference ? focusReference(selectedReference) : controls.reset());
-  fit();
-  window.addEventListener("resize", () => {
-    fit();
-    if (selectedReference) focusReference(selectedReference);
-  });
+  const xs = parcelPoints.map(([x]) => x), zs = parcelPoints.map(([, z]) => z);
+  const parcelCenter = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2];
+  const parcelSpan = [Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)];
+  // North-up plan view. A tiny southward offset keeps OrbitControls' azimuth defined.
+  const goTop = () => {
+    const distance = Math.max(parcelSpan[1], parcelSpan[0] / camera.aspect) * 1.3 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    controls.target.set(parcelCenter[0], homeTarget.y, parcelCenter[1]);
+    camera.up.set(0, 0, -1);
+    controls.maxPolarAngle = 0.0001;
+    controls.enableRotate = false;
+    camera.position.set(parcelCenter[0], homeTarget.y + distance, parcelCenter[1] + distance * 1e-3);
+    controls.update();
+  };
+  document.getElementById("reset").addEventListener("click", goHome);
+  document.getElementById("top-view").addEventListener("click", goTop);
+  window.addEventListener("resize", fit);
   loading.hidden = true;
   renderer.setAnimationLoop(() => {
     controls.update();
+    updateOverlays();
     renderer.render(scene, camera);
   });
 } catch (cause) {
