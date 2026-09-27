@@ -33,7 +33,9 @@ The two supplied aerials can be draped over the model. Inside the lot they lie o
 
 ## Concepts
 
-The default view is the existing site. The **Concepts** switcher shows one concept at a time over it without moving the camera. Each concept lives in `concepts/` and is listed in `concepts/index.js`; add a new file that exports options with an `id`, `title`, `subtitle`, `stats`, `notes`, and a `build(context)` function returning a Three.js group, then add it to the index.
+The default view is the existing site. Concepts are grouped into categories (fence, house, and so on), and the bar at the bottom of the model switches each category independently: None, then each option in turn. Any mix can be combined, for example fence 1B with a house option. The selection is kept in the URL (`?fence=fence-neighbour&house=…`) so a combination can be shared, and ← → cycle the highlighted category while ↑ ↓ change which category the keys drive. The panel shows the details of whatever is selected.
+
+Each category lives in `concepts/` and is registered in `concepts/index.js` with an `id`, `label`, and `options`. Each option has an `id`, `title`, `subtitle`, `stats`, `notes`, and a `build(context)` function returning a Three.js group.
 
 Concept 1 compares dog-fence outlines: a clearing fit, the clearing plus the western forest to the neighbour boundary, a frontage-and-sides outline, and the whole lot. Every option keeps its Foley Road side 4.5 m inside the boundary, so the gate has a 7 m holding bay from the carriageway edge and a car never waits on the road.
 

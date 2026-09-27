@@ -719,33 +719,75 @@ try {
   toggle("road-toggle", roadGroup);
   toggle("easement-toggle", easementGroup);
   toggle("boundary-toggle", boundaryGroup);
-  // Concepts: exactly one shows at a time over the unchanged existing site, without moving the camera.
-  const conceptList = document.getElementById("concepts");
-  const conceptDetails = document.getElementById("concept-details");
+  // Concepts: each category switches independently from the bottom bar, one option at a time
+  // (or none) over the unchanged existing site, without moving the camera. The selection lives in
+  // the URL (?fence=fence-neighbour&house=...) so a combination can be shared or reloaded.
+  const categories = concepts.filter((category) => category.options.length);
   const conceptContext = { THREE, data, groundHeight: ground.height, drapePolygon };
-  const conceptGroups = new Map(concepts.map((concept) => {
-    const group = concept.build(conceptContext);
+  const conceptGroups = new Map(categories.flatMap((category) => category.options.map((option) => {
+    const group = option.build(conceptContext);
     group.visible = false;
     scene.add(group);
-    return [concept.id, group];
-  }));
-  const selectConcept = (id) => {
-    conceptGroups.forEach((group, key) => { group.visible = key === id; });
-    conceptList.querySelectorAll("[role=radio]").forEach((button) => button.setAttribute("aria-checked", String(button.dataset.id === id)));
-    const concept = concepts.find((candidate) => candidate.id === id);
-    conceptDetails.hidden = !concept;
-    if (concept) conceptDetails.innerHTML = `<ul>${concept.stats.map((stat) => `<li>${stat}</li>`).join("")}</ul>${concept.notes.map((note) => `<p>${note}</p>`).join("")}`;
+    return [option.id, group];
+  })));
+  const conceptBar = document.getElementById("concept-bar");
+  const conceptDetails = document.getElementById("concept-details");
+  const params = new URLSearchParams(location.search);
+  const selection = new Map(categories.map((category) => [category.id, category.options.some((option) => option.id === params.get(category.id)) ? params.get(category.id) : null]));
+  let activeCategory = categories[0]?.id;
+  const render = () => {
+    conceptGroups.forEach((group) => { group.visible = false; });
+    selection.forEach((id) => { if (id) conceptGroups.get(id).visible = true; });
+    const url = new URL(location.href);
+    selection.forEach((id, category) => id ? url.searchParams.set(category, id) : url.searchParams.delete(category));
+    history.replaceState(null, "", url);
+    conceptBar.querySelectorAll(".bar-row").forEach((row) => {
+      const category = categories.find((candidate) => candidate.id === row.dataset.category);
+      const index = category.options.findIndex((option) => option.id === selection.get(category.id));
+      const option = category.options[index];
+      row.classList.toggle("active", category.id === activeCategory);
+      row.querySelector(".bar-value").innerHTML = option ? `${option.title}${option.recommended ? " <em>suggested</em>" : ""}` : "None";
+      row.querySelector(".bar-count").textContent = `${index + 1}/${category.options.length}`;
+    });
+    const chosen = categories.map((category) => [category, category.options.find((option) => option.id === selection.get(category.id))]).filter(([, option]) => option);
+    conceptDetails.innerHTML = chosen.length
+      ? chosen.map(([category, option]) => `<div class="concept-details"><div class="concept-title">${category.label} · ${option.title}</div><ul>${option.stats.map((stat) => `<li>${stat}</li>`).join("")}</ul>${option.notes.map((note) => `<p>${note}</p>`).join("")}</div>`).join("")
+      : `<p class="concept-empty">Existing site only. Use the arrows below the model, or ← → keys, to try concepts.</p>`;
   };
-  [{ id: "existing", title: "Existing site", subtitle: "As surveyed and mapped" }, ...concepts].forEach((entry) => {
-    const button = document.createElement("button");
-    button.className = "concept";
-    button.setAttribute("role", "radio");
-    button.dataset.id = entry.id;
-    button.innerHTML = `<span class="radio"></span><span class="name">${entry.title}${entry.recommended ? " <em>suggested</em>" : ""}<small>${entry.subtitle}</small></span>`;
-    button.addEventListener("click", () => selectConcept(entry.id));
-    conceptList.append(button);
+  // Each category cycles None → option 1 → … → last → None.
+  const step = (categoryId, direction) => {
+    const category = categories.find((candidate) => candidate.id === categoryId);
+    const ids = [null, ...category.options.map((option) => option.id)];
+    const index = ids.indexOf(selection.get(categoryId));
+    selection.set(categoryId, ids[(index + direction + ids.length) % ids.length]);
+    activeCategory = categoryId;
+    render();
+  };
+  categories.forEach((category) => {
+    const row = document.createElement("div");
+    row.className = "bar-row";
+    row.dataset.category = category.id;
+    row.innerHTML = `<button class="bar-arrow" aria-label="Previous ${category.label.toLowerCase()} concept">‹</button><span class="bar-label"><span class="bar-category">${category.label} <span class="bar-count"></span></span><span class="bar-value"></span></span><button class="bar-arrow" aria-label="Next ${category.label.toLowerCase()} concept">›</button>`;
+    const [previous, next] = row.querySelectorAll("button");
+    previous.addEventListener("click", () => step(category.id, -1));
+    next.addEventListener("click", () => step(category.id, 1));
+    conceptBar.append(row);
   });
-  selectConcept("existing");
+  conceptBar.hidden = !categories.length;
+  // ← → cycle the active category; ↑ ↓ choose which category the keys drive.
+  window.addEventListener("keydown", (event) => {
+    if (!activeCategory || event.target.closest("input, textarea, [contenteditable]") || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      step(activeCategory, event.key === "ArrowLeft" ? -1 : 1);
+    } else if ((event.key === "ArrowUp" || event.key === "ArrowDown") && categories.length > 1) {
+      event.preventDefault();
+      const index = categories.findIndex((category) => category.id === activeCategory);
+      activeCategory = categories[(index + (event.key === "ArrowUp" ? -1 : 1) + categories.length) % categories.length].id;
+      render();
+    }
+  });
+  render();
   toggle("zone-toggle", constraints.buildingZone);
   toggle("setback-toggle", constraints.setbacks);
   toggle("slope-toggle", constraints.slope);

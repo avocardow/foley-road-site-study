@@ -55,13 +55,19 @@
       .check:after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #9aa596; transition: transform .15s, background .15s; }
       .layer[aria-pressed="true"] .check { background: #7f975a; }
       .layer[aria-pressed="true"] .check:after { transform: translateX(11px); background: #eef5e2; }
-      .concept { display: grid; grid-template-columns: 14px 1fr; align-items: center; gap: 10px; width: 100%; padding: 7px 0; border: 0; background: none; text-align: left; cursor: pointer; }
-      .concept small { display: block; color: var(--faint); font-size: 11px; margin-top: 1px; }
-      .concept em { font-style: normal; font-size: 10px; color: #f2c14e; border: 1px solid #f2c14e66; border-radius: 4px; padding: 0 4px; margin-left: 4px; }
-      .concept .radio { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #9aa596; }
-      .concept[aria-checked="true"] .radio { border-color: #f2c14e; background: radial-gradient(circle, #f2c14e 0 3.5px, transparent 4.5px); }
-      .concept[aria-checked="false"] .name { color: var(--muted); }
-      .concept-details { margin: 6px 0 4px 24px; padding: 10px 12px; border-left: 2px solid #f2c14e66; color: var(--muted); font-size: 12px; line-height: 1.5; }
+      .concept-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 4px; padding: 4px; border-radius: 12px; background: #0c100fe6; border: 1px solid #ffffff24; box-shadow: 0 8px 24px #0008; }
+      .concept-bar[hidden] { display: none; }
+      .bar-row { display: grid; grid-template-columns: 32px minmax(200px, 1fr) 32px; align-items: center; border-radius: 8px; }
+      .bar-row.active { background: #ffffff0d; }
+      .bar-arrow { height: 36px; border: 0; background: none; color: var(--text); font-size: 22px; line-height: 1; cursor: pointer; border-radius: 8px; }
+      .bar-arrow:hover { background: #ffffff14; }
+      .bar-label { text-align: center; line-height: 1.25; padding: 3px 0; }
+      .bar-category { display: block; color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+      .bar-value { font-size: 13px; font-weight: 500; white-space: nowrap; }
+      .bar-value em, .concept-title em { font-style: normal; font-size: 10px; color: #f2c14e; border: 1px solid #f2c14e66; border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+      .concept-title { color: var(--text); font-weight: 500; margin-bottom: 6px; }
+      .concept-empty { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 4px 0 0; }
+      .concept-details { margin: 6px 0 10px; padding: 10px 12px; border-left: 2px solid #f2c14e66; color: var(--muted); font-size: 12px; line-height: 1.5; }
       .concept-details ul { margin: 0; padding-left: 16px; color: var(--text); }
       .concept-details p { margin: 8px 0 0; }
       .note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
@@ -76,6 +82,10 @@
       @media (max-width: 850px) {
         body { height: auto; overflow: auto; }
         main { height: auto; grid-template-columns: 1fr; grid-template-rows: 62vh auto; }
+        .concept-bar { bottom: 58px; }
+        .bar-row { grid-template-columns: 32px minmax(170px, 1fr) 32px; }
+        .bar-value { white-space: normal; }
+        .bar-value em { display: none; }
         aside { border-left: 0; border-top: 1px solid var(--line); }
       }
     </style>
@@ -88,6 +98,7 @@
         <div class="toolbar"><button class="tool" id="top-view">Top view</button><button class="tool" id="reset">Reset</button></div>
         <div class="scale"><span class="scale-line" id="scale-line"></span><span id="scale-label">≈ 25 m</span></div>
         <div class="north" role="img" aria-label="North indicator"><span class="north-needle" id="north-needle">N</span></div>
+        <div class="concept-bar" id="concept-bar" aria-label="Concept switcher" hidden></div>
         <div class="error" id="error" hidden></div>
       </section>
       <aside>
@@ -100,8 +111,7 @@
         </dl>
 
         <h2>Concepts</h2>
-        <div id="concepts" role="radiogroup" aria-label="Concepts"></div>
-        <div class="concept-details" id="concept-details" hidden></div>
+        <div id="concept-details" aria-live="polite"></div>
 
         <h2>Land</h2>
         <button class="layer" id="boundary-toggle" aria-pressed="true"><span class="swatch" style="background:#59d9cc"></span><span class="name">Boundary<small>State cadastre, ±0.25 m</small></span><span class="check"></span></button>
