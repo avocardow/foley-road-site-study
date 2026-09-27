@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import data from "./site-data.json";
+import concepts from "./concepts/index.js";
 
 const canvas = document.querySelector("#model");
 const loading = document.querySelector("#loading");
@@ -718,6 +719,33 @@ try {
   toggle("road-toggle", roadGroup);
   toggle("easement-toggle", easementGroup);
   toggle("boundary-toggle", boundaryGroup);
+  // Concepts: exactly one shows at a time over the unchanged existing site, without moving the camera.
+  const conceptList = document.getElementById("concepts");
+  const conceptDetails = document.getElementById("concept-details");
+  const conceptContext = { THREE, data, groundHeight: ground.height, drapePolygon };
+  const conceptGroups = new Map(concepts.map((concept) => {
+    const group = concept.build(conceptContext);
+    group.visible = false;
+    scene.add(group);
+    return [concept.id, group];
+  }));
+  const selectConcept = (id) => {
+    conceptGroups.forEach((group, key) => { group.visible = key === id; });
+    conceptList.querySelectorAll("[role=radio]").forEach((button) => button.setAttribute("aria-checked", String(button.dataset.id === id)));
+    const concept = concepts.find((candidate) => candidate.id === id);
+    conceptDetails.hidden = !concept;
+    if (concept) conceptDetails.innerHTML = `<ul>${concept.stats.map((stat) => `<li>${stat}</li>`).join("")}</ul>${concept.notes.map((note) => `<p>${note}</p>`).join("")}`;
+  };
+  [{ id: "existing", title: "Existing site", subtitle: "As surveyed and mapped" }, ...concepts].forEach((entry) => {
+    const button = document.createElement("button");
+    button.className = "concept";
+    button.setAttribute("role", "radio");
+    button.dataset.id = entry.id;
+    button.innerHTML = `<span class="radio"></span><span class="name">${entry.title}${entry.recommended ? " <em>suggested</em>" : ""}<small>${entry.subtitle}</small></span>`;
+    button.addEventListener("click", () => selectConcept(entry.id));
+    conceptList.append(button);
+  });
+  selectConcept("existing");
   toggle("zone-toggle", constraints.buildingZone);
   toggle("setback-toggle", constraints.setbacks);
   toggle("slope-toggle", constraints.slope);

@@ -31,4 +31,10 @@ This project builds to `dist` with Vite and deploys to GitHub Pages through GitH
 
 The two supplied aerials can be draped over the model. Inside the lot they lie on the DEM terrain; outside it they lie on the 2 m DEM grid, as do the roads. Each photo toggle is independent; when both are on, the wider view blends over the parcel detail to make residual image offsets visible. The parcel edge is drawn in turquoise from the cadastral geometry. **Top view** gives a north-up plan. The parcel detail is tied to the cadastral corners; the wider image is registered with a projective fit to shared features around the parcel and roads (64 inliers; median residual 0.73 close-image pixels). The white boundary on either aerial is approximate and is not used as a control. This checks relative image alignment, not survey accuracy.
 
+## Concepts
+
+The default view is the existing site. The **Concepts** switcher shows one concept at a time over it without moving the camera. Each concept lives in `concepts/` and is listed in `concepts/index.js`; add a new file that exports options with an `id`, `title`, `subtitle`, `stats`, `notes`, and a `build(context)` function returning a Three.js group, then add it to the index.
+
+Concept 1 compares dog-fence outlines: a clearing fit, the clearing plus the western forest to the neighbour boundary, a frontage-and-sides outline, and the whole lot. Every option keeps its Foley Road side 4.5 m inside the boundary, so the gate has a 7 m holding bay from the carriageway edge and a car never waits on the road.
+
 The page includes `noindex` metadata and a permissive `robots.txt` so crawlers can read the directive. Search engine exclusion is a request to crawlers, not access control; anyone with a public link may still open it.
