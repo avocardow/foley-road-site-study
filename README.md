@@ -27,6 +27,6 @@ This project builds to `dist` with Vite and deploys to GitHub Pages through GitH
 
 `site-data.json` contains a sampled triangular terrain mesh from the Queensland DEM service and the cadastral outline. The clearing patch is draped over the terrain and clipped to the lot; about 500 m² is shown. Tree crowns and the concrete apron make site features readable, but their positions, sizes, and shapes are illustrative rather than surveyed. The 3D terrain has no vertical exaggeration. Public sources do not replace a feature survey for boundary pegs, spot levels, tree locations, services, or easements.
 
-The two supplied aerials are available as fitted, north-up reference layers. The parcel detail image is tied to the cadastral corners; the wider view is only an orientation guide because its outline and perspective are approximate.
+The two supplied aerials are available as fitted, north-up reference layers. The parcel detail image is tied to the cadastral corners; the wider image keeps its original proportions and aligns to the road frontage as a context guide because its outline is approximate.
 
 The page includes `noindex` metadata and a permissive `robots.txt` so crawlers can read the directive. Search engine exclusion is a request to crawlers, not access control; anyone with a public link may still open it.

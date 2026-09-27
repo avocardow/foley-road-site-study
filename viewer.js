@@ -377,24 +377,37 @@ function makeRoadContext(data, sampleHeight) {
   drivewayGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#898c87", roughness: 0.95, side: THREE.DoubleSide })));
 }
 
-function makeAerialReference({ file, data, vertices, label }) {
+function makeAerialReference({ file, data, vertices, edge, label }) {
   const width = 1384, height = 952, cropY = 15, visibleHeight = height - cropY * 2;
   const targets = data.boundary.map(([x, , z]) => [x, z]);
-  const [p0, p1, p2] = vertices;
-  const determinant = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (p1[1] - p0[1]);
-  const affine = (values) => {
-    const [v0, v1, v2] = values;
-    const a = ((v1 - v0) * (p2[1] - p0[1]) - (v2 - v0) * (p1[1] - p0[1])) / determinant;
-    const b = ((p1[0] - p0[0]) * (v2 - v0) - (p2[0] - p0[0]) * (v1 - v0)) / determinant;
-    return (x, y) => [v0 + a * (x - p0[0]) + b * (y - p0[1])];
-  };
-  const xAt = affine(targets.map(([x]) => x));
-  const zAt = affine(targets.map(([, z]) => z));
+  let mapPixel;
+  if (edge) {
+    const [[u0, v0], [u1, v1], target0, target1] = edge;
+    const [x0, z0] = targets[target0], [x1, z1] = targets[target1];
+    const du = u1 - u0, dv = v1 - v0, dx = x1 - x0, dz = z1 - z0;
+    const denominator = du * du + dv * dv;
+    const a = (dx * du + dz * dv) / denominator;
+    const b = (dz * du - dx * dv) / denominator;
+    mapPixel = (u, v) => [x0 + a * (u - u0) - b * (v - v0), z0 + b * (u - u0) + a * (v - v0)];
+  } else {
+    const [p0, p1, p2] = vertices;
+    const determinant = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (p1[1] - p0[1]);
+    const affine = (values) => {
+      const [v0, v1, v2] = values;
+      const a = ((v1 - v0) * (p2[1] - p0[1]) - (v2 - v0) * (p1[1] - p0[1])) / determinant;
+      const b = ((p1[0] - p0[0]) * (v2 - v0) - (p2[0] - p0[0]) * (v1 - v0)) / determinant;
+      return (x, y) => v0 + a * (x - p0[0]) + b * (y - p0[1]);
+    };
+    const xAt = affine(targets.map(([x]) => x));
+    const zAt = affine(targets.map(([, z]) => z));
+    mapPixel = (x, y) => [xAt(x, y), zAt(x, y)];
+  }
   const pixelCorners = [[0, cropY], [width, cropY], [width, height - cropY], [0, height - cropY]];
   const y = Math.max(data.elevationRangeM[1] + 12, 48);
   const positions = [], uvs = [];
   for (const [px, py] of pixelCorners) {
-    positions.push(xAt(px, py)[0], y, zAt(px, py)[0]);
+    const [x, z] = mapPixel(px, py);
+    positions.push(x, y, z);
     uvs.push(px / width, 1 - py / height);
   }
   const geometry = new THREE.BufferGeometry();
@@ -408,11 +421,13 @@ function makeAerialReference({ file, data, vertices, label }) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   group.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.52, depthWrite: false, side: THREE.DoubleSide })));
-  const boundaryLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(targets.map(([x, z]) => new THREE.Vector3(x, y + 0.25, z))), new THREE.LineDashedMaterial({ color: "#f2d18f", dashSize: 3, gapSize: 1.8 }));
-  boundaryLine.computeLineDistances();
-  group.add(boundaryLine);
+  if (!edge) {
+    const boundaryLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(targets.map(([x, z]) => new THREE.Vector3(x, y + 0.25, z))), new THREE.LineDashedMaterial({ color: "#f2d18f", dashSize: 3, gapSize: 1.8 }));
+    boundaryLine.computeLineDistances();
+    group.add(boundaryLine);
+  }
   aerialGroup.add(group);
-  const world = pixelCorners.map(([px, py]) => [xAt(px, py)[0], zAt(px, py)[0]]);
+  const world = pixelCorners.map(([px, py]) => mapPixel(px, py));
   const xs = world.map(([x]) => x), zs = world.map(([, z]) => z);
   return { group, label, buttonId: label === "Parcel aerial" ? "aerial-closeup-toggle" : "aerial-area-toggle", center: [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2], width: Math.max(...xs) - Math.min(...xs), height: Math.max(...zs) - Math.min(...zs) };
 }
@@ -443,7 +458,7 @@ try {
   makeRoadContext(data, sampleHeight);
   const references = [
     makeAerialReference({ file: "./aerial-reference-close.jpg", data, vertices: [[308, 416], [523, 648], [1039, 400]], label: "Parcel aerial" }),
-    makeAerialReference({ file: "./aerial-reference-area.jpg", data, vertices: [[805, 660], [474, 815], [896, 822]], label: "Area aerial" }),
+    makeAerialReference({ file: "./aerial-reference-area.jpg", data, edge: [[474, 815], [896, 822], 1, 2], label: "Area aerial" }),
   ];
   toggle("terrain-toggle", terrainGroup);
   toggle("contour-toggle", contoursGroup);
