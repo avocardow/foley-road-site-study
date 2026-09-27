@@ -377,18 +377,16 @@ function makeRoadContext(data, sampleHeight) {
   drivewayGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#898c87", roughness: 0.95, side: THREE.DoubleSide })));
 }
 
-function makeAerialReference({ file, data, vertices, edge, label }) {
+function makeAerialReference({ file, data, vertices, homography, label }) {
   const width = 1384, height = 952, cropY = 15, visibleHeight = height - cropY * 2;
   const targets = data.boundary.map(([x, , z]) => [x, z]);
   let mapPixel;
-  if (edge) {
-    const [[u0, v0], [u1, v1], target0, target1] = edge;
-    const [x0, z0] = targets[target0], [x1, z1] = targets[target1];
-    const du = u1 - u0, dv = v1 - v0, dx = x1 - x0, dz = z1 - z0;
-    const denominator = du * du + dv * dv;
-    const a = (dx * du + dz * dv) / denominator;
-    const b = (dz * du - dx * dv) / denominator;
-    mapPixel = (u, v) => [x0 + a * (u - u0) - b * (v - v0), z0 + b * (u - u0) + a * (v - v0)];
+  if (homography) {
+    const [[a, b, c], [d, e, f], [g, h, i]] = homography;
+    mapPixel = (u, v) => {
+      const divisor = g * u + h * v + i;
+      return [(a * u + b * v + c) / divisor, (d * u + e * v + f) / divisor];
+    };
   } else {
     const [p0, p1, p2] = vertices;
     const determinant = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (p1[1] - p0[1]);
@@ -402,18 +400,28 @@ function makeAerialReference({ file, data, vertices, edge, label }) {
     const zAt = affine(targets.map(([, z]) => z));
     mapPixel = (x, y) => [xAt(x, y), zAt(x, y)];
   }
-  const pixelCorners = [[0, cropY], [width, cropY], [width, height - cropY], [0, height - cropY]];
   const y = Math.max(data.elevationRangeM[1] + 12, 48);
   const positions = [], uvs = [];
-  for (const [px, py] of pixelCorners) {
+  const columns = homography ? 24 : 1, rows = homography ? 16 : 1;
+  for (let row = 0; row <= rows; row++) for (let column = 0; column <= columns; column++) {
+    const u = column / columns, v = row / rows;
+    const px = u * width, py = cropY + v * visibleHeight;
     const [x, z] = mapPixel(px, py);
     positions.push(x, y, z);
-    uvs.push(px / width, 1 - py / height);
+    uvs.push(u, 1 - py / height);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.setIndex([0, 1, 2, 0, 2, 3]);
+  const indices = [];
+  for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+    const topLeft = row * (columns + 1) + column;
+    const topRight = topLeft + 1;
+    const bottomLeft = topLeft + columns + 1;
+    const bottomRight = bottomLeft + 1;
+    indices.push(topLeft, topRight, bottomRight, topLeft, bottomRight, bottomLeft);
+  }
+  geometry.setIndex(indices);
   const group = new THREE.Group();
   group.name = label;
   group.visible = false;
@@ -421,13 +429,11 @@ function makeAerialReference({ file, data, vertices, edge, label }) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   group.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.52, depthWrite: false, side: THREE.DoubleSide })));
-  if (!edge) {
-    const boundaryLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(targets.map(([x, z]) => new THREE.Vector3(x, y + 0.25, z))), new THREE.LineDashedMaterial({ color: "#f2d18f", dashSize: 3, gapSize: 1.8 }));
-    boundaryLine.computeLineDistances();
-    group.add(boundaryLine);
-  }
+  const boundaryLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(targets.map(([x, z]) => new THREE.Vector3(x, y + 0.25, z))), new THREE.LineDashedMaterial({ color: "#f2d18f", dashSize: 3, gapSize: 1.8 }));
+  boundaryLine.computeLineDistances();
+  group.add(boundaryLine);
   aerialGroup.add(group);
-  const world = pixelCorners.map(([px, py]) => mapPixel(px, py));
+  const world = [[0, cropY], [width, cropY], [width, height - cropY], [0, height - cropY]].map(([px, py]) => mapPixel(px, py));
   const xs = world.map(([x]) => x), zs = world.map(([, z]) => z);
   return { group, label, buttonId: label === "Parcel aerial" ? "aerial-closeup-toggle" : "aerial-area-toggle", center: [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2], width: Math.max(...xs) - Math.min(...xs), height: Math.max(...zs) - Math.min(...zs) };
 }
@@ -458,7 +464,8 @@ try {
   makeRoadContext(data, sampleHeight);
   const references = [
     makeAerialReference({ file: "./aerial-reference-close.jpg", data, vertices: [[308, 416], [523, 648], [1039, 400]], label: "Parcel aerial" }),
-    makeAerialReference({ file: "./aerial-reference-area.jpg", data, edge: [[474, 815], [896, 822], 1, 2], label: "Area aerial" }),
+    // Wide-to-detail RANSAC ties (34 inliers) composed with the detail's parcel transform.
+    makeAerialReference({ file: "./aerial-reference-area.jpg", data, homography: [[-0.2290748474, 0.2884579112, -53.1378137481], [-0.29094921, -0.2297106469, 389.0934423236], [-0.0000026198, 0.0002069447, 1]], label: "Area aerial" }),
   ];
   toggle("terrain-toggle", terrainGroup);
   toggle("contour-toggle", contoursGroup);
