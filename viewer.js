@@ -685,17 +685,6 @@ function updateOverlays() {
   northNeedle.style.transform = `rotate(${angle}rad)`;
 }
 
-// True when any footprint polygon in one list overlaps one in the other (sampled on a 0.5 m grid).
-function footprintsOverlap(listA, listB) {
-  return listA.some((a) => listB.some((b) => {
-    const xs = a.map(([x]) => x), zs = a.map(([, z]) => z);
-    for (let x = Math.min(...xs); x <= Math.max(...xs); x += 0.5) for (let z = Math.min(...zs); z <= Math.max(...zs); z += 0.5) {
-      if (insidePolygon(x, z, a.map(([px, pz]) => [px, 0, pz])) && insidePolygon(x, z, b.map(([px, pz]) => [px, 0, pz]))) return true;
-    }
-    return false;
-  }));
-}
-
 function fit() {
   const { width, height } = canvas.getBoundingClientRect();
   renderer.setSize(width, height, false);
@@ -742,7 +731,7 @@ try {
     return [option.id, group];
   })));
   const conceptBar = document.getElementById("concept-bar");
-  const conceptDetails = document.getElementById("concept-details");
+  const viewpointBar = document.getElementById("viewpoints");
   const params = new URLSearchParams(location.search);
   const selection = new Map(categories.map((category) => [category.id, category.options.some((option) => option.id === params.get(category.id)) ? params.get(category.id) : null]));
   let activeCategory = categories[0]?.id;
@@ -760,18 +749,14 @@ try {
       row.querySelector(".bar-value").innerHTML = option ? `${option.title}${option.recommended ? " <em>suggested</em>" : ""}` : "None";
       row.querySelector(".bar-count").textContent = `${index + 1}/${category.options.length}`;
     });
-    const chosen = categories.map((category) => [category, category.options.find((option) => option.id === selection.get(category.id))]).filter(([, option]) => option);
-    const clashes = [];
-    chosen.forEach(([, a], i) => chosen.slice(i + 1).forEach(([, b]) => {
-      if (a.footprints && b.footprints && footprintsOverlap(a.footprints(data), b.footprints(data))) clashes.push(`${a.title} and ${b.title} overlap on the site.`);
-    }));
-    conceptDetails.innerHTML = clashes.map((clash) => `<p class="concept-clash">${clash}</p>`).join("") + (chosen.length
-      ? chosen.map(([category, option]) => `<div class="concept-details"><div class="concept-title">${category.label} · ${option.title}</div><ul>${option.stats.map((stat) => `<li>${stat}</li>`).join("")}</ul>${option.viewpoints ? `<div class="viewpoints"><span>Step inside</span>${option.viewpoints(data).map((view, index) => `<button class="view" data-option="${option.id}" data-index="${index}">${view.label}</button>`).join("")}</div>` : ""}${option.notes.map((note) => `<p>${note}</p>`).join("")}</div>`).join("")
-      : `<p class="concept-empty">Existing site only. Use the arrows below the model, or ← → keys, to try concepts.</p>`);
-    conceptDetails.querySelectorAll("button[data-option]").forEach((button) => button.addEventListener("click", () => {
-      const option = categories.flatMap((category) => category.options).find((candidate) => candidate.id === button.dataset.option);
-      stepInside(option.viewpoints(data)[Number(button.dataset.index)]);
-    }));
+    // Step-inside buttons on the model for any selected concept that has eye-level views.
+    const views = categories.flatMap((category) => {
+      const option = category.options.find((candidate) => candidate.id === selection.get(category.id));
+      return option?.viewpoints ? option.viewpoints(data) : [];
+    });
+    viewpointBar.hidden = !views.length;
+    viewpointBar.innerHTML = views.length ? `<span>Step inside</span>${views.map((view, index) => `<button class="view" data-index="${index}">${view.label}</button>`).join("")}` : "";
+    viewpointBar.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => stepInside(views[Number(button.dataset.index)])));
   };
   // Eye-level view inside a concept: a wide lens, a near clipping plane, and orbiting around a point
   // just ahead, so dragging looks around. Reset and Top view restore the site camera.

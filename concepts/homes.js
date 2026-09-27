@@ -5,7 +5,7 @@
 // separate secondary dwelling under the 60 m² cap, as far from the siblings' building as the
 // pocket allows. Everything is single level and inside the existing clearing.
 // Positions were checked against the site model; see research/three-homes-layouts.md.
-import { buildParts, costRange, footprint, pointAt } from "./building.js";
+import { buildParts, costRange, pointAt } from "./building.js";
 
 const home = (name, origin, width, length, floorLevel, rooms, extra = {}) => ({ role: name, origin, width, length, floorLevel, rooms, ...extra });
 
@@ -102,7 +102,6 @@ export default layouts.map((layout) => {
       `Couple's home indicative cost: ${costRange(couple)}`,
     ],
     notes: [...layout.notes, approval, ...shared],
-    footprints: (data) => parts.map((part) => footprint(data, part)),
     viewpoints: (data) => (layout.viewpoints ?? []).map(({ label, part, from, to }) => {
       const spec = parts[part], eye = spec.floorLevel + 1.6;
       const [fx, fz] = pointAt(data, spec, ...from), [tx, tz] = pointAt(data, spec, ...to);

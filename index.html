@@ -64,17 +64,12 @@
       .bar-label { text-align: center; line-height: 1.25; padding: 3px 0; }
       .bar-category { display: block; color: var(--faint); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
       .bar-value { font-size: 13px; font-weight: 500; white-space: nowrap; }
-      .bar-value em, .concept-title em { font-style: normal; font-size: 10px; color: #f2c14e; border: 1px solid #f2c14e66; border-radius: 4px; padding: 0 4px; margin-left: 4px; }
-      .concept-title { color: var(--text); font-weight: 500; margin-bottom: 6px; }
-      .viewpoints { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 2px; }
+      .bar-value em { font-style: normal; font-size: 10px; color: #f2c14e; border: 1px solid #f2c14e66; border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+      .viewpoints { position: absolute; top: 16px; left: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; max-width: calc(100% - 200px); padding: 5px 6px; border: 1px solid var(--line); border-radius: 8px; background: #151b19d9; }
+      .viewpoints[hidden] { display: none; }
       .viewpoints span { color: var(--faint); font-size: 11px; margin-right: 2px; }
       .viewpoints .view { border: 1px solid #f2c14e66; background: #f2c14e14; color: var(--text); border-radius: 6px; padding: 4px 8px; font-size: 11px; cursor: pointer; }
       .viewpoints .view:hover { background: #f2c14e33; }
-      .concept-clash { color: #ffc7b9; background: #4c252580; border: 1px solid #a5534b; border-radius: 6px; padding: 6px 8px; font-size: 12px; margin: 4px 0 8px; }
-      .concept-empty { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 4px 0 0; }
-      .concept-details { margin: 6px 0 10px; padding: 10px 12px; border-left: 2px solid #f2c14e66; color: var(--muted); font-size: 12px; line-height: 1.5; }
-      .concept-details ul { margin: 0; padding-left: 16px; color: var(--text); }
-      .concept-details p { margin: 8px 0 0; }
       .note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
       details { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
       summary { cursor: pointer; color: var(--text); }
@@ -97,6 +92,7 @@
         .north { top: 16px; left: 16px; right: auto; bottom: auto; }
         .scale { top: 24px; left: 58px; bottom: auto; }
         .toolbar { top: 12px; right: 12px; }
+        .viewpoints { top: 60px; left: 12px; max-width: calc(100% - 24px); }
         .tool { padding: 9px 12px; }
       }
       /* Portrait phones: the model on top, the panel scrolling below it. */
@@ -121,6 +117,7 @@
         <div class="toolbar"><button class="tool" id="top-view">Top view</button><button class="tool" id="reset">Reset</button></div>
         <div class="scale"><span class="scale-line" id="scale-line"></span><span id="scale-label">≈ 25 m</span></div>
         <div class="north" role="img" aria-label="North indicator"><span class="north-needle" id="north-needle">N</span></div>
+        <div class="viewpoints" id="viewpoints" hidden></div>
         <div class="concept-bar" id="concept-bar" aria-label="Concept switcher" hidden></div>
         <div class="error" id="error" hidden></div>
       </section>
@@ -133,8 +130,6 @@
           <div><dt>Clearing</dt><dd>~523 <span class="unit">m²</span></dd></div>
         </dl>
 
-        <h2>Concepts</h2>
-        <div id="concept-details" aria-live="polite"></div>
 
         <h2>Land</h2>
         <button class="layer" id="boundary-toggle" aria-pressed="true"><span class="swatch" style="background:#59d9cc"></span><span class="name">Boundary<small>State cadastre, ±0.25 m</small></span><span class="check"></span></button>

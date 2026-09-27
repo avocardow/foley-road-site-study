@@ -280,12 +280,6 @@ export function buildParts(context, specs) {
   return group;
 }
 
-// Site-plan outlines (x, z) of a spec's footprint, for overlap checks between concepts.
-export function footprint(data, spec) {
-  const at = localFrame(siteFrame(data), spec);
-  return [at(0, 0), at(spec.width, 0), at(spec.width, spec.length), at(0, spec.length)];
-}
-
 function localFrame(toXZ, spec) {
   const [s0, d0] = spec.origin;
   const theta = (spec.rotation ?? 0) * Math.PI / 180;
