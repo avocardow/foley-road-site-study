@@ -856,9 +856,10 @@ try {
     });
   });
   const xs = parcelPoints.map(([x]) => x), zs = parcelPoints.map(([, z]) => z);
-  const parcelCenter = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2];
+  const clearingCenter = data.clearedArea.reduce((sum, [x, , z]) => [sum[0] + x / data.clearedArea.length, sum[1] + z / data.clearedArea.length], [0, 0]);
   const parcelSpan = [Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)];
-  // The starting view: looking straight down, north up, framed on the lot. The camera sits a hair
+  // The starting view: looking straight down, north up, centred on the clearing at a zoom that
+  // takes in about the whole lot. The camera sits a hair
   // south of the target so north is up on screen; orbiting, rotating, and zooming all stay free.
   const resetView = () => {
     leaveInside();
@@ -866,8 +867,8 @@ try {
     camera.up.set(0, 1, 0);
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.enableRotate = true;
-    controls.target.set(parcelCenter[0], groundLevel, parcelCenter[1]);
-    camera.position.set(parcelCenter[0], groundLevel + distance, parcelCenter[1] + distance * 1e-3);
+    controls.target.set(clearingCenter[0], groundLevel, clearingCenter[1]);
+    camera.position.set(clearingCenter[0], groundLevel + distance, clearingCenter[1] + distance * 1e-3);
     controls.update();
   };
   document.getElementById("reset").addEventListener("click", resetView);
