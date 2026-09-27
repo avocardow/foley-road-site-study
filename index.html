@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="googlebot" content="noindex, nofollow, noarchive" />
+    <title>Foley Road site model</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
+        }
+      }
+    </script>
+    <style>
+      :root { color-scheme: dark; font-family: "DM Sans", sans-serif; background: #111716; color: #edf0e9; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; overflow: hidden; background: #111716; }
+      button, a { font: inherit; }
+      .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; min-height: 520px; }
+      header { height: 70px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 28px; border-bottom: 1px solid #ffffff14; background: #171e1c; }
+      .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
+      .brand-icon { width: 34px; height: 34px; border: 1px solid #abc18b66; border-radius: 10px; display: grid; place-items: center; color: #c1d39f; font-size: 17px; }
+      .brand-title { font-family: Manrope, sans-serif; font-size: 14px; font-weight: 700; letter-spacing: .02em; }
+      .brand-subtitle { color: #a8b0a7; font-size: 11px; margin-top: 2px; }
+      .header-status { display: flex; align-items: center; gap: 8px; color: #cbd7bb; border: 1px solid #a6c78635; background: #798e6720; border-radius: 30px; padding: 8px 12px; font-size: 11px; white-space: nowrap; }
+      .dot { width: 7px; height: 7px; border-radius: 50%; background: #b7d489; box-shadow: 0 0 10px #b7d48966; }
+      main { min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 320px; }
+      .viewport { min-width: 0; min-height: 0; position: relative; background: radial-gradient(ellipse at 48% 42%, #28312c 0, #171e1c 52%, #111716 100%); }
+      #model { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+      .view-label { position: absolute; top: 22px; left: 25px; display: flex; flex-direction: column; gap: 5px; pointer-events: none; }
+      .eyebrow { text-transform: uppercase; letter-spacing: .14em; color: #aeba9e; font-size: 9px; font-weight: 700; }
+      .view-label strong { font-family: Manrope, sans-serif; font-size: 17px; font-weight: 600; }
+      .view-label span { color: #b5bdb4; font-size: 11px; }
+      .toolbar { position: absolute; top: 22px; right: 22px; display: flex; gap: 8px; }
+      .tool, .layer { color: #e5e9df; border: 1px solid #ffffff24; border-radius: 9px; background: #19211fdd; padding: 9px 12px; cursor: pointer; font-size: 11px; transition: background .15s, border-color .15s; }
+      .tool:hover, .layer:hover { border-color: #b9d0977a; background: #26302b; }
+      .layer[aria-pressed="true"] { color: #d8e8bf; border-color: #b9d09782; background: #71875435; }
+      .scale { position: absolute; bottom: 21px; left: 25px; color: #c0c8bd; font-size: 10px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+      .scale-line { width: 52px; border-top: 1px solid #d3dbc9; position: relative; }
+      .scale-line:before, .scale-line:after { content: ""; position: absolute; top: -4px; height: 7px; border-left: 1px solid #d3dbc9; }
+      .scale-line:before { left: 0; } .scale-line:after { right: 0; }
+      .north { position: absolute; bottom: 19px; right: 23px; width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid #ffffff24; border-radius: 50%; background: #17201eaa; color: #d3dfc5; font-size: 11px; pointer-events: none; }
+      aside { overflow-y: auto; border-left: 1px solid #ffffff14; background: #171e1c; padding: 22px 20px 18px; }
+      .section-kicker { color: #9faa96; text-transform: uppercase; letter-spacing: .13em; font-size: 9px; font-weight: 700; margin: 2px 0 10px; }
+      h1 { font-family: Manrope, sans-serif; font-size: 20px; line-height: 1.25; margin: 0 0 6px; font-weight: 600; }
+      .address { color: #aeb6ad; font-size: 12px; margin-bottom: 17px; }
+      .stats { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #ffffff17; border-radius: 11px; overflow: hidden; margin-bottom: 20px; }
+      .stat { padding: 12px 11px; min-height: 68px; }
+      .stat + .stat { border-left: 1px solid #ffffff17; }
+      .stat-label { color: #9faa96; font-size: 10px; margin-bottom: 7px; }
+      .stat-value { color: #f0f2ec; font-family: Manrope, sans-serif; font-size: 15px; font-weight: 600; }
+      .stat-unit { color: #a9b1a7; font-size: 10px; font-weight: 400; }
+      .rule { height: 1px; background: #ffffff17; margin: 18px 0; }
+      .layer-list { display: grid; gap: 8px; }
+      .layer { display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 10px 11px; }
+      .layer-label { display: flex; align-items: center; gap: 9px; }
+      .swatch { width: 13px; height: 13px; border-radius: 4px; border: 1px solid #ffffff50; }
+      .swatch.terrain { background: linear-gradient(135deg, #586c56, #c4cf9e); }
+      .swatch.contour { background: #d9dbc5; }
+      .swatch.clear { background: #d9ad68; }
+      .swatch.trees { background: #486346; }
+      .check { color: #c5d99e; font-size: 13px; }
+      .road-card { display: grid; gap: 9px; }
+      .road { color: #e1e6dc; font-size: 12px; display: flex; align-items: center; gap: 9px; }
+      .road-line { width: 23px; border-top: 2px solid #e0b675; }
+      .road-line.highway { border-color: #c2d497; }
+      .note { color: #aab3a9; font-size: 11px; line-height: 1.55; }
+      .note strong { color: #e1e7dc; font-weight: 600; }
+      .accuracy { border: 1px solid #bb98604a; background: #9b73421a; border-radius: 9px; padding: 11px 12px; color: #d4c09d; font-size: 10px; line-height: 1.5; margin-top: 15px; }
+      .accuracy b { color: #ecdbbd; font-weight: 600; }
+      .sources { display: grid; gap: 9px; }
+      .sources a { color: #bfd395; text-decoration: none; font-size: 11px; line-height: 1.35; }
+      .sources a:hover { color: #e3f3c6; text-decoration: underline; }
+      .source-meta { display: block; color: #89958c; font-size: 9px; margin-top: 2px; }
+      .loading { position: absolute; inset: 0; display: grid; place-items: center; color: #c4ceb8; font-size: 13px; }
+      .loading[hidden] { display: none; }
+      .error { position: absolute; inset: auto 20px 20px; color: #ffc7b9; background: #4c2525; border: 1px solid #a5534b; padding: 12px; border-radius: 8px; font-size: 12px; }
+      @media (max-width: 850px) {
+        body { overflow: auto; }
+        .app { height: auto; min-height: 100vh; grid-template-rows: 58px minmax(0, 1fr); }
+        header { height: 58px; padding: 0 15px; }
+        .brand-icon { width: 30px; height: 30px; }
+        .header-status { padding: 7px 9px; font-size: 10px; }
+        main { grid-template-columns: 1fr; grid-template-rows: minmax(56vh, 1fr) auto; }
+        aside { border-left: 0; border-top: 1px solid #ffffff14; padding: 20px 17px 24px; }
+        .toolbar { top: 14px; right: 12px; }
+        .view-label { top: 15px; left: 15px; }
+        .view-label strong { font-size: 14px; }
+        .tool { padding: 8px 9px; }
+        .scale { left: 14px; bottom: 13px; }
+        .north { right: 13px; bottom: 12px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="brand">
+          <div class="brand-icon">⌂</div>
+          <div><div class="brand-title">FOLEY ROAD · SITE STUDY</div><div class="brand-subtitle">Woombye, Queensland</div></div>
+        </div>
+        <div class="header-status"><span class="dot"></span> Land model · no building</div>
+      </header>
+      <main>
+        <section class="viewport" aria-label="Interactive three-dimensional land model">
+          <canvas id="model"></canvas>
+          <div class="loading" id="loading">Loading parcel and terrain…</div>
+          <div class="view-label"><div class="eyebrow">Lot 1SP353650</div><strong>Vacant triangular parcel</strong><span>Terrain is shown at true vertical scale</span></div>
+          <div class="toolbar"><button class="tool" id="reset">Reset view</button></div>
+          <div class="scale"><span class="scale-line"></span><span>≈ 25 m</span></div>
+          <div class="north">N ↑</div>
+          <div class="error" id="error" hidden></div>
+        </section>
+        <aside>
+          <div class="section-kicker">Site model</div>
+          <h1>77 Foley Road</h1>
+          <div class="address">Woombye QLD 4559 · Lot 1SP353650</div>
+          <div class="stats">
+            <div class="stat"><div class="stat-label">Council land area</div><div class="stat-value">4,083 <span class="stat-unit">m²</span></div></div>
+            <div class="stat"><div class="stat-label">Sampled ground levels</div><div class="stat-value" id="elevation-range">—</div></div>
+          </div>
+          <div class="section-kicker">Visible layers</div>
+          <div class="layer-list">
+            <button class="layer" id="terrain-toggle" aria-pressed="true"><span class="layer-label"><span class="swatch terrain"></span> Bare-earth terrain</span><span class="check">✓</span></button>
+            <button class="layer" id="contour-toggle" aria-pressed="true"><span class="layer-label"><span class="swatch contour"></span> 1 m contours</span><span class="check">✓</span></button>
+            <button class="layer" id="clearing-toggle" aria-pressed="true"><span class="layer-label"><span class="swatch clear"></span> Clearing / open pad · ~500 m² shown</span><span class="check">✓</span></button>
+            <button class="layer" id="trees-toggle" aria-pressed="true"><span class="layer-label"><span class="swatch trees"></span> Tree cover &amp; tree line</span><span class="check">✓</span></button>
+          </div>
+          <div class="rule"></div>
+          <div class="section-kicker">Road edges</div>
+          <div class="road-card">
+            <div class="road"><span class="road-line"></span> Foley Road frontage</div>
+            <div class="road"><span class="road-line highway"></span> Nambour Connection Road frontage</div>
+          </div>
+          <div class="accuracy"><b>Vegetation is illustrative.</b> Crown shapes show the wooded cover and treeline clearly; exact tree positions and species are not surveyed. The open pad is estimated from aerial imagery. Use a feature survey for tree locations, legal boundaries, easements, services, and design levels.</div>
+          <div class="rule"></div>
+          <div class="section-kicker">Sources and references</div>
+          <div class="sources">
+            <a href="https://maps.scc.qld.gov.au/sitereport/index.html?report=da_public&lotplan=1SP353650" target="_blank" rel="noreferrer">Sunshine Coast Council site report<span class="source-meta">Site area, contours, overlays, and mapped constraints</span></a>
+            <a href="https://spatial-gis.information.qld.gov.au/arcgis/rest/services/PlanningCadastre/QSCF_LandParcelPropertyFramework/FeatureServer/120" target="_blank" rel="noreferrer">Queensland cadastral parcel layer<span class="source-meta">Graphical parcel geometry for lot 1SP353650</span></a>
+            <a href="https://spatial-img.information.qld.gov.au/arcgis/rest/services/Elevation/QldDem/ImageServer" target="_blank" rel="noreferrer">Queensland bare-earth elevation service<span class="source-meta">DEM sample; capture date and resolution vary by project</span></a>
+            <a href="https://www.realestate.com.au/property-residential+land-qld-woombye-204453584" target="_blank" rel="noreferrer">Property listing and aerial photos<span class="source-meta">Approx. 600 m² existing cleared area</span></a>
+            <a href="https://maps.app.goo.gl/kHhAVHyf9Vt2Pbne6" target="_blank" rel="noreferrer">Google Maps 3D aerial<span class="source-meta">Visual context; address pin is on the neighbouring block</span></a>
+          </div>
+        </aside>
+      </main>
+    </div>
+    <script type="module" src="./viewer.js"></script>
+  </body>
+</html>
