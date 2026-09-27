@@ -4,17 +4,18 @@ An interactive, browser-based terrain study for lot 1SP353650 at 77 Foley Road, 
 
 ## View locally
 
-Run a static web server from this folder, then open its local URL in a browser:
+Install dependencies once, then run the Vite dev server:
 
 ```sh
-python3 -m http.server 8000
+npm install
+npm run dev
 ```
 
-Open `http://localhost:8000`.
+Vite prints the local URL and reloads the viewer when its files change.
 
 ## Share
 
-This project is set up for GitHub Pages. The page sends `noindex` metadata to crawlers, while remaining public to anyone with its URL. That is a search-engine request, not access control. [GitHub Pages publishing from a branch](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
+This project builds to `dist` with Vite and deploys to GitHub Pages through GitHub Actions. The page sends `noindex` metadata to crawlers while remaining public to anyone with its URL. That is a search-engine request, not access control. See [Vite's GitHub Pages deployment guide](https://vite.dev/guide/static-deploy#github-pages).
 
 ## Data and references
 
@@ -24,9 +25,10 @@ This project is set up for GitHub Pages. The page sends `noindex` metadata to cr
 - [Realestate.com.au listing](https://www.realestate.com.au/property-residential+land-qld-woombye-204453584): source for the marketing aerials and the approximate 600 m² cleared area.
 - [Google Maps 3D aerial](https://maps.app.goo.gl/kHhAVHyf9Vt2Pbne6): visual check of the current site. Its 77 Foley Road pin marks the neighbouring developed block, so the model uses the lot-plan geometry instead.
 - [Three.js OrbitControls](https://threejs.org/docs/pages/OrbitControls.html): orbit, zoom, and pan controls for the 3D viewer.
+- [Vite](https://vite.dev/guide/): local hot reload and static site build.
 
 ## Model notes
 
-`site-data.json` contains a sampled triangular terrain mesh from the Queensland DEM service and the cadastral outline. The approximate clearing patch is draped over the terrain and clipped to the lot; about 500 m² is shown, based on the listing's roughly 600 m² estimate. Tree crowns make the woodland edge readable, but their positions, sizes, and species are illustrative rather than a tree survey. The 3D terrain has no vertical exaggeration. Public sources do not replace a feature survey for boundary pegs, spot levels, tree locations, services, or easements.
+`site-data.json` contains a sampled triangular terrain mesh from the Queensland DEM service and the cadastral outline. The approximate clearing patch is draped over the terrain and clipped to the lot; about 500 m² is shown, based on the listing's roughly 600 m² estimate. Tree crowns make the woodland edge readable, but their positions, sizes, and species are illustrative rather than a tree survey. The concrete apron shown in the supplied site photos is drawn as a separate approximate layer. The 3D terrain has no vertical exaggeration. Public sources do not replace a feature survey for boundary pegs, spot levels, tree locations, services, or easements.
 
-The page includes `noindex` metadata for a future unindexed share link. Search engine exclusion is a request to crawlers, not access control; anyone with a public link may still open it.
+The page includes `noindex` metadata and a permissive `robots.txt` so crawlers can read the directive. Search engine exclusion is a request to crawlers, not access control; anyone with a public link may still open it.

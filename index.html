@@ -6,18 +6,9 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="googlebot" content="noindex, nofollow, noarchive" />
     <title>Foley Road site model</title>
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/"
-        }
-      }
-    </script>
     <style>
       :root { color-scheme: dark; font-family: "DM Sans", sans-serif; background: #111716; color: #edf0e9; }
       * { box-sizing: border-box; }
@@ -66,6 +57,7 @@
       .swatch.contour { background: #d9dbc5; }
       .swatch.clear { background: #d9ad68; }
       .swatch.trees { background: #486346; }
+      .swatch.driveway { background: #aeb0ac; }
       .check { color: #c5d99e; font-size: 13px; }
       .road-card { display: grid; gap: 9px; }
       .road { color: #e1e6dc; font-size: 12px; display: flex; align-items: center; gap: 9px; }
@@ -132,6 +124,7 @@
             <button class="layer" id="contour-toggle" aria-pressed="true"><span class="layer-label"><span class="swatch contour"></span> 1 m contours</span><span class="check">✓</span></button>
             <button class="layer" id="clearing-toggle" aria-pressed="true"><span class="layer-label"><span class="swatch clear"></span> Clearing / open pad · ~500 m² shown</span><span class="check">✓</span></button>
             <button class="layer" id="trees-toggle" aria-pressed="true"><span class="layer-label"><span class="swatch trees"></span> Tree cover &amp; tree line</span><span class="check">✓</span></button>
+            <button class="layer" id="driveway-toggle" aria-pressed="true"><span class="layer-label"><span class="swatch driveway"></span> Existing concrete apron · approx.</span><span class="check">✓</span></button>
           </div>
           <div class="rule"></div>
           <div class="section-kicker">Road edges</div>
@@ -139,7 +132,7 @@
             <div class="road"><span class="road-line"></span> Foley Road frontage</div>
             <div class="road"><span class="road-line highway"></span> Nambour Connection Road frontage</div>
           </div>
-          <div class="accuracy"><b>Vegetation is illustrative.</b> Crown shapes show the wooded cover and treeline clearly; exact tree positions and species are not surveyed. The open pad is estimated from aerial imagery. Use a feature survey for tree locations, legal boundaries, easements, services, and design levels.</div>
+          <div class="accuracy"><b>Site details are approximate.</b> Tree positions and crown shapes are illustrative. The concrete apron footprint and location are estimated from the site photos. Use a feature survey for tree locations, legal boundaries, easements, services, and design levels.</div>
           <div class="rule"></div>
           <div class="section-kicker">Sources and references</div>
           <div class="sources">

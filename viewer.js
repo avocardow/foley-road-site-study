@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import data from "./site-data.json";
 
 const canvas = document.querySelector("#model");
 const loading = document.querySelector("#loading");
@@ -34,7 +35,8 @@ const terrainGroup = new THREE.Group();
 const contoursGroup = new THREE.Group();
 const clearingGroup = new THREE.Group();
 const treesGroup = new THREE.Group();
-scene.add(terrainGroup, contoursGroup, clearingGroup, treesGroup);
+const drivewayGroup = new THREE.Group();
+scene.add(terrainGroup, contoursGroup, clearingGroup, treesGroup, drivewayGroup);
 
 function makeTerrain(data) {
   const position = new Float32Array(data.points.length * 3);
@@ -240,7 +242,7 @@ function makeTrees(data) {
       const t = THREE.MathUtils.clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
       return Math.hypot(x - (ax + t * dx), z - (az + t * dz));
     }));
-    if (insidePolygon(x, z, data.clearedArea) || clearingEdge < 3.2) continue;
+    if (insidePolygon(x, z, data.clearedArea) || insidePolygon(x, z, data.driveway) || clearingEdge < 3.2) continue;
     const nearest = data.points.reduce((best, point) => {
       const distance = (point[0] - x) ** 2 + (point[2] - z) ** 2;
       return !best || distance < best.distance ? { point, distance } : best;
@@ -280,6 +282,27 @@ function makeTrees(data) {
   treesGroup.add(trunks, crowns);
 }
 
+function makeDriveway(data, sampleHeight) {
+  const corners = data.driveway;
+  const columns = 12, rows = 6;
+  const positions = [];
+  const pointAt = (u, v) => {
+    const x = (1 - v) * ((1 - u) * corners[0][0] + u * corners[1][0]) + v * ((1 - u) * corners[3][0] + u * corners[2][0]);
+    const z = (1 - v) * ((1 - u) * corners[0][2] + u * corners[1][2]) + v * ((1 - u) * corners[3][2] + u * corners[2][2]);
+    return [x, sampleHeight(x, z) + 0.18, z];
+  };
+  for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+    const u0 = column / columns, u1 = (column + 1) / columns;
+    const v0 = row / rows, v1 = (row + 1) / rows;
+    const a = pointAt(u0, v0), b = pointAt(u1, v0), c = pointAt(u1, v1), d = pointAt(u0, v1);
+    positions.push(...a, ...b, ...c, ...a, ...c, ...d);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  drivewayGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#aeb0ac", roughness: 0.94, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 })));
+}
+
 function toggle(buttonId, group) {
   const button = document.getElementById(buttonId);
   button.addEventListener("click", () => {
@@ -297,18 +320,17 @@ function fit() {
 }
 
 try {
-  const response = await fetch("./site-data.json");
-  if (!response.ok) throw new Error(`Could not load site data (${response.status})`);
-  const data = await response.json();
   const sampleHeight = terrainSampler(data);
   makeTerrain(data);
   makeContours(data);
   makeClearing(data, sampleHeight);
   makeTrees(data);
+  makeDriveway(data, sampleHeight);
   toggle("terrain-toggle", terrainGroup);
   toggle("contour-toggle", contoursGroup);
   toggle("clearing-toggle", clearingGroup);
   toggle("trees-toggle", treesGroup);
+  toggle("driveway-toggle", drivewayGroup);
   document.getElementById("elevation-range").innerHTML = `${data.elevationRangeM[0]}–${data.elevationRangeM[1]} <span class="stat-unit">m</span>`;
   controls.target.set(0, (data.elevationRangeM[0] + data.elevationRangeM[1]) / 2, 0);
   camera.position.set(93, 120, 165);
