@@ -37,7 +37,8 @@ const clearingGroup = new THREE.Group();
 const treesGroup = new THREE.Group();
 const drivewayGroup = new THREE.Group();
 const accessGroup = new THREE.Group();
-scene.add(terrainGroup, contoursGroup, clearingGroup, treesGroup, drivewayGroup, accessGroup);
+const aerialGroup = new THREE.Group();
+scene.add(terrainGroup, contoursGroup, clearingGroup, treesGroup, drivewayGroup, accessGroup, aerialGroup);
 
 function makeTerrain(data) {
   const position = new Float32Array(data.points.length * 3);
@@ -376,6 +377,46 @@ function makeRoadContext(data, sampleHeight) {
   drivewayGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#898c87", roughness: 0.95, side: THREE.DoubleSide })));
 }
 
+function makeAerialReference({ file, data, vertices, label }) {
+  const width = 1384, height = 952, cropY = 15, visibleHeight = height - cropY * 2;
+  const targets = data.boundary.map(([x, , z]) => [x, z]);
+  const [p0, p1, p2] = vertices;
+  const determinant = (p1[0] - p0[0]) * (p2[1] - p0[1]) - (p2[0] - p0[0]) * (p1[1] - p0[1]);
+  const affine = (values) => {
+    const [v0, v1, v2] = values;
+    const a = ((v1 - v0) * (p2[1] - p0[1]) - (v2 - v0) * (p1[1] - p0[1])) / determinant;
+    const b = ((p1[0] - p0[0]) * (v2 - v0) - (p2[0] - p0[0]) * (v1 - v0)) / determinant;
+    return (x, y) => [v0 + a * (x - p0[0]) + b * (y - p0[1])];
+  };
+  const xAt = affine(targets.map(([x]) => x));
+  const zAt = affine(targets.map(([, z]) => z));
+  const pixelCorners = [[0, cropY], [width, cropY], [width, height - cropY], [0, height - cropY]];
+  const y = Math.max(data.elevationRangeM[1] + 12, 48);
+  const positions = [], uvs = [];
+  for (const [px, py] of pixelCorners) {
+    positions.push(xAt(px, py)[0], y, zAt(px, py)[0]);
+    uvs.push(px / width, 1 - py / height);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex([0, 1, 2, 0, 2, 3]);
+  const group = new THREE.Group();
+  group.name = label;
+  group.visible = false;
+  const texture = new THREE.TextureLoader().load(file);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  group.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.52, depthWrite: false, side: THREE.DoubleSide })));
+  const boundaryLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(targets.map(([x, z]) => new THREE.Vector3(x, y + 0.25, z))), new THREE.LineDashedMaterial({ color: "#f2d18f", dashSize: 3, gapSize: 1.8 }));
+  boundaryLine.computeLineDistances();
+  group.add(boundaryLine);
+  aerialGroup.add(group);
+  const world = pixelCorners.map(([px, py]) => [xAt(px, py)[0], zAt(px, py)[0]]);
+  const xs = world.map(([x]) => x), zs = world.map(([, z]) => z);
+  return { group, label, buttonId: label === "Parcel aerial" ? "aerial-closeup-toggle" : "aerial-area-toggle", center: [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...zs) + Math.max(...zs)) / 2], width: Math.max(...xs) - Math.min(...xs), height: Math.max(...zs) - Math.min(...zs) };
+}
+
 function toggle(buttonId, group) {
   const button = document.getElementById(buttonId);
   button.addEventListener("click", () => {
@@ -400,6 +441,10 @@ try {
   makeTrees(data);
   makeDriveway(data, sampleHeight);
   makeRoadContext(data, sampleHeight);
+  const references = [
+    makeAerialReference({ file: "./aerial-reference-close.jpg", data, vertices: [[308, 416], [523, 648], [1039, 400]], label: "Parcel aerial" }),
+    makeAerialReference({ file: "./aerial-reference-area.jpg", data, vertices: [[805, 660], [474, 815], [896, 822]], label: "Area aerial" }),
+  ];
   toggle("terrain-toggle", terrainGroup);
   toggle("contour-toggle", contoursGroup);
   toggle("clearing-toggle", clearingGroup);
@@ -411,9 +456,55 @@ try {
   camera.position.set(93, 120, 165);
   controls.update();
   controls.saveState();
-  document.getElementById("reset").addEventListener("click", () => controls.reset());
+  let selectedReference = null;
+  let savedView = null;
+  const focusReference = (reference) => {
+    const aspect = camera.aspect;
+    const distance = Math.max(reference.height, reference.width / aspect) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.08;
+    camera.up.set(0, 0, -1);
+    camera.far = Math.max(1200, distance * 3);
+    camera.updateProjectionMatrix();
+    controls.maxDistance = Math.max(430, distance * 1.1);
+    controls.target.set(reference.center[0], (data.elevationRangeM[0] + data.elevationRangeM[1]) / 2, reference.center[1]);
+    camera.position.set(reference.center[0], controls.target.y + distance, reference.center[1]);
+    controls.update();
+  };
+  references.forEach((reference) => {
+    const button = document.getElementById(reference.buttonId);
+    button.addEventListener("click", () => {
+      if (selectedReference === reference) {
+        reference.group.visible = false;
+        button.setAttribute("aria-pressed", "false");
+        selectedReference = null;
+        if (savedView) {
+          camera.position.copy(savedView.position);
+          camera.up.copy(savedView.up);
+          controls.target.copy(savedView.target);
+          controls.maxDistance = savedView.maxDistance;
+          camera.far = savedView.far;
+          camera.updateProjectionMatrix();
+          controls.enableRotate = savedView.enableRotate;
+          controls.update();
+        }
+        savedView = null;
+        return;
+      }
+      if (!selectedReference) savedView = { position: camera.position.clone(), up: camera.up.clone(), target: controls.target.clone(), maxDistance: controls.maxDistance, far: camera.far, enableRotate: controls.enableRotate };
+      references.forEach((candidate) => {
+        candidate.group.visible = candidate === reference;
+        document.getElementById(candidate.buttonId).setAttribute("aria-pressed", String(candidate === reference));
+      });
+      selectedReference = reference;
+      controls.enableRotate = false;
+      focusReference(reference);
+    });
+  });
+  document.getElementById("reset").addEventListener("click", () => selectedReference ? focusReference(selectedReference) : controls.reset());
   fit();
-  window.addEventListener("resize", fit);
+  window.addEventListener("resize", () => {
+    fit();
+    if (selectedReference) focusReference(selectedReference);
+  });
   loading.hidden = true;
   renderer.setAnimationLoop(() => {
     controls.update();
