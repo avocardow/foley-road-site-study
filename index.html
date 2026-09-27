@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="googlebot" content="noindex, nofollow, noarchive" />
     <title>Foley Road site model</title>
@@ -84,14 +84,32 @@
       .sources a { color: var(--accent); text-decoration: none; }
       .sources a:hover { text-decoration: underline; }
 
-      @media (max-width: 850px) {
-        body { height: auto; overflow: auto; }
-        main { height: auto; grid-template-columns: 1fr; grid-template-rows: 62vh auto; }
-        .concept-bar { bottom: 58px; }
-        .bar-row { grid-template-columns: 32px minmax(170px, 1fr) 32px; }
-        .bar-value { white-space: normal; }
+      /* Phones and small tablets: the switcher docks along the bottom edge of the model as a compact
+         strip, and the scale and north arrow move to the top-left, so nothing floats over the homes. */
+      @media (max-width: 850px), (max-height: 500px) {
+        .concept-bar { left: 0; right: 0; bottom: 0; transform: none; gap: 0; padding: 2px 4px calc(2px + env(safe-area-inset-bottom)); border-radius: 0; border-width: 1px 0 0; box-shadow: none; background: #0c100fee; }
+        .bar-row { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+        .bar-arrow { height: 40px; font-size: 26px; }
+        .bar-label { display: flex; align-items: baseline; justify-content: center; gap: 6px; min-width: 0; padding: 0; }
+        .bar-category { flex: none; }
+        .bar-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
         .bar-value em { display: none; }
+        .north { top: 16px; left: 16px; right: auto; bottom: auto; }
+        .scale { top: 24px; left: 58px; bottom: auto; }
+        .toolbar { top: 12px; right: 12px; }
+        .tool { padding: 9px 12px; }
+      }
+      /* Portrait phones: the model on top, the panel scrolling below it. */
+      @media (max-width: 850px) and (min-height: 501px) {
+        body { height: auto; overflow: auto; }
+        main { height: auto; grid-template-columns: 1fr; grid-template-rows: 68svh auto; }
         aside { border-left: 0; border-top: 1px solid var(--line); }
+      }
+      /* Landscape phones: the model fills the height, with a narrower panel beside it. */
+      @media (max-height: 500px) {
+        main { height: 100svh; grid-template-columns: minmax(0, 1fr) min(300px, 38vw); grid-template-rows: 1fr; }
+        aside { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+        .bar-arrow { height: 34px; }
       }
     </style>
   </head>
