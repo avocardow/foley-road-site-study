@@ -80,6 +80,15 @@ export function buildHouse({ THREE, data, groundHeight, drapePolygon }, spec) {
   context.strokeStyle = "#1f1f1c";
   context.lineWidth = 8;
   context.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+  // Openings: stretches of the outline where this part opens into a joined part.
+  for (const [x0, y0, x1, y1, kind = "living"] of spec.openings ?? []) {
+    context.strokeStyle = COLORS[kind];
+    context.lineWidth = 12;
+    context.beginPath();
+    context.moveTo(Math.max(x0 * scale, 8), Math.min(Math.max(row(y0), 4), canvas.height - 4));
+    context.lineTo(Math.min(x1 * scale, canvas.width - 8), Math.min(Math.max(row(y1), 4), canvas.height - 4));
+    context.stroke();
+  }
   context.fillStyle = "#1f1f1c";
   context.textAlign = "center";
   context.textBaseline = "middle";

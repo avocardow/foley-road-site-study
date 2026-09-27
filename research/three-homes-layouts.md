@@ -119,3 +119,31 @@ Shared space strengthens the case that the homes are "used in conjunction with" 
 - **The best all-rounder is layout 1, "Front pair, big home behind."** Each group gets its own zone. The siblings are near the parking on the high ground; the couple get the quiet, north-facing back. The shared deck and the garden strip tie the three homes together. The siblings' two 35 m² homes are the closest of the detached layouts to the $300k budget.
 - **The cheapest to build is layout 7, "Terrace row."** One roof and shared walls, but no shared outdoor space beyond the decks, and two fire-rated walls.
 - **The most sociable is layout 5, "Courtyard."** The smallest homes, but the best outdoor room, and the easiest to frame as F3.
+
+## Interior audit and resize (option A)
+
+Checked on 2026-09-28 against two sets of benchmarks:
+- [NSW Apartment Design Guide 4D](https://apps.planningportal.nsw.gov.au/prweb/PRRestService/DocMgmt/v1/PublicDocuments/DATA-WORKATTACH-FILE%20PEC-DPE-EP-WORK%20PPSSCC-674!20251105T055251.707%20GMT): the NSW apartment minimums, used here as a benchmark because Queensland sets no room sizes for houses. They are 35 m² for a studio, 50 m² for one bedroom and 70 m² for two bedrooms. Bedrooms need 10 m² (main) or 9 m² (others) and a 3 m minimum dimension, excluding wardrobes. Living rooms need to be 3.6 m wide (one bedroom) or 4 m wide (two bedrooms).
+- [Livable Housing Design Standard 2022](https://ncc.abcb.gov.au/sites/default/files/resources/2023/livable-housing-design-20221219.pdf): a 900 × 1200 mm clear space in front of the toilet pan, clear of the door swing, and a step-free, hobless shower.
+
+Internal sizes below allow for 150 mm external walls and 90 mm internal walls.
+
+**As first drawn (4 × 8.4, 4 × 10.8 and 4 × 13.5 m):**
+
+| Home | Internal area | Problems |
+|---|---|---|
+| Wide | ~30 m² | Below a studio. The bedroom is 2.8 m deep, too short for a queen bed plus walkway. The open living area is only ~11 m², including the kitchen. |
+| Flex | ~39 m² | The bedroom is 2.9 m deep. Otherwise the most comfortable of the three: ~20 m² of open living. |
+| Couple's home | ~49 m² | The second bedroom is 2.5 m deep. The living room is 3.7 m wide, under the 4 m two-bedroom benchmark, and ~20 m² for two people. |
+| Bathrooms | 2.2 × 2.2 m | Tight for the 900 × 1200 toilet space plus a step-free shower and vanity. |
+
+**Resized using the spare room on the site:**
+
+- **Wide: 41 m², about 37 m² internal.** Its living room continues into the back notch: a 3.0 × 2.4 m extension, trimmed to stay 10.1 m from the stream, which also roofs over the car. Open living and dining is about 17 m². The bedroom is 3.3 m deep and the bathroom 2.4 × 2.2 m.
+- **Flex: 43 m², about 39 m² internal.** The bedroom is 3.3 m deep, the bathroom 2.4 × 2.2 m, a study nook 1.6 × 2.2 m, and about 19 m² of open living.
+- **Couple's home: 4.4 × 13.5 = 59.4 m², just under the 60 m² cap, about 54 m² internal.** The living room is 4.1 m wide inside, about 20 m². The bedrooms are 3.25 m and 3.1 m deep, and the bathroom is 2.6 × 2.2 m. Widening it towards the driveway leaves 0.5 m clear of the driveway and a 4.4 m gap between the homes.
+- **Decks:**
+  - A shared 6 × 2.4 m north deck off the siblings' building, over the turning court. It has 2.4 m of headroom underneath, so it doubles as cover for cars.
+  - A 4.4 × 2 m entry deck at the front of the couple's home.
+
+All three homes remain below the apartment-guide totals for their bedroom count (37 and 39 m² against 50 m²; 54 m² against 70 m²). That is the trade-off for three homes in about 300 m² of buildable ground. The rooms themselves now meet the room-level minimums, and the decks add outdoor living.
