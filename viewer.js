@@ -23,7 +23,7 @@ camera.up.set(0, 1, 0);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.minDistance = 65;
+controls.minDistance = 18;
 controls.maxDistance = 430;
 controls.maxPolarAngle = Math.PI * 0.48;
 
@@ -685,6 +685,17 @@ function updateOverlays() {
   northNeedle.style.transform = `rotate(${angle}rad)`;
 }
 
+// True when any footprint polygon in one list overlaps one in the other (sampled on a 0.5 m grid).
+function footprintsOverlap(listA, listB) {
+  return listA.some((a) => listB.some((b) => {
+    const xs = a.map(([x]) => x), zs = a.map(([, z]) => z);
+    for (let x = Math.min(...xs); x <= Math.max(...xs); x += 0.5) for (let z = Math.min(...zs); z <= Math.max(...zs); z += 0.5) {
+      if (insidePolygon(x, z, a.map(([px, pz]) => [px, 0, pz])) && insidePolygon(x, z, b.map(([px, pz]) => [px, 0, pz]))) return true;
+    }
+    return false;
+  }));
+}
+
 function fit() {
   const { width, height } = canvas.getBoundingClientRect();
   renderer.setSize(width, height, false);
@@ -750,9 +761,13 @@ try {
       row.querySelector(".bar-count").textContent = `${index + 1}/${category.options.length}`;
     });
     const chosen = categories.map((category) => [category, category.options.find((option) => option.id === selection.get(category.id))]).filter(([, option]) => option);
-    conceptDetails.innerHTML = chosen.length
+    const clashes = [];
+    chosen.forEach(([, a], i) => chosen.slice(i + 1).forEach(([, b]) => {
+      if (a.footprints && b.footprints && footprintsOverlap(a.footprints(data), b.footprints(data))) clashes.push(`${a.title} and ${b.title} overlap on the site.`);
+    }));
+    conceptDetails.innerHTML = clashes.map((clash) => `<p class="concept-clash">${clash}</p>`).join("") + (chosen.length
       ? chosen.map(([category, option]) => `<div class="concept-details"><div class="concept-title">${category.label} · ${option.title}</div><ul>${option.stats.map((stat) => `<li>${stat}</li>`).join("")}</ul>${option.notes.map((note) => `<p>${note}</p>`).join("")}</div>`).join("")
-      : `<p class="concept-empty">Existing site only. Use the arrows below the model, or ← → keys, to try concepts.</p>`;
+      : `<p class="concept-empty">Existing site only. Use the arrows below the model, or ← → keys, to try concepts.</p>`);
   };
   // Each category cycles None → option 1 → … → last → None.
   const step = (categoryId, direction) => {
