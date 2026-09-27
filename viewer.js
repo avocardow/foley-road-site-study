@@ -425,10 +425,10 @@ function makeTrees(data, sampleHeight) {
 }
 
 // When the camera is below the top of the tallest tree, anywhere on or off the lot, hide every tree
-// so the view is never blocked. The meshes are hidden rather than the group, so the Trees layer
-// switch keeps its own state.
-function hideTreesBelowCanopy(canopyTop) {
-  const below = camera.position.y < canopyTop;
+// so the view is never blocked, except in Step inside views, where the trees are the outlook. The
+// meshes are hidden rather than the group, so the Trees layer switch keeps its own state.
+function hideTreesBelowCanopy(canopyTop, inside) {
+  const below = !inside && camera.position.y < canopyTop;
   for (const mesh of treesGroup.children) mesh.visible = !below;
 }
 
@@ -918,7 +918,7 @@ try {
     stepZoom(now);
     controls.update();
     updateOverlays();
-    hideTreesBelowCanopy(canopyTop);
+    hideTreesBelowCanopy(canopyTop, hiddenMarkers !== null);
     renderer.render(scene, camera);
   });
 } catch (cause) {
