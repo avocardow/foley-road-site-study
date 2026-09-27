@@ -15,7 +15,7 @@ Vite prints the local URL and reloads the viewer when its files change.
 
 ## Share
 
-This project builds to `dist` with Vite and deploys to GitHub Pages through GitHub Actions. The page sends `noindex` metadata to crawlers while remaining public to anyone with its URL. That is a search-engine request, not access control. See [Vite's GitHub Pages deployment guide](https://vite.dev/guide/static-deploy#github-pages).
+This project builds to `dist` with Vite and deploys to GitHub Pages through GitHub Actions. The page sends `noindex` metadata to crawlers while remaining public to anyone with its URL. That is a search-engine request, not access control.
 
 ## Data and references
 
@@ -24,8 +24,6 @@ This project builds to `dist` with Vite and deploys to GitHub Pages through GitH
 - [Queensland Elevation DEM service](https://spatial-img.information.qld.gov.au/arcgis/rest/services/Elevation/QldDem/ImageServer): supplies a bare-earth terrain raster. The service combines projects with different resolutions and accuracies.
 - [Realestate.com.au listing](https://www.realestate.com.au/property-residential+land-qld-woombye-204453584): source for the marketing aerials and the approximate 600 m² cleared area.
 - [Google Maps 3D aerial](https://maps.app.goo.gl/kHhAVHyf9Vt2Pbne6): visual check of the current site. Its 77 Foley Road pin marks the neighbouring developed block, so the model uses the lot-plan geometry instead.
-- [Three.js OrbitControls](https://threejs.org/docs/pages/OrbitControls.html): orbit, zoom, and pan controls for the 3D viewer.
-- [Vite](https://vite.dev/guide/): local hot reload and static site build.
 
 ## Model notes
 
