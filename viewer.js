@@ -409,8 +409,10 @@ function makeTrees(data, sampleHeight) {
     scale.set(1, height, 1);
     matrix.compose(position, rotation, scale);
     trunks.setMatrixAt(index, matrix);
-    position.set(tree.x, tree.y + height + 1.5 + random() * 0.7, tree.z);
-    scale.set(tree.radius, 3.0 + random() * 1.5, tree.depth);
+    const crownY = tree.y + height + 1.5 + random() * 0.7, crownHeight = 3.0 + random() * 1.5;
+    position.set(tree.x, crownY, tree.z);
+    scale.set(tree.radius, crownHeight, tree.depth);
+    tree.top = crownY + crownHeight;
     matrix.compose(position, rotation, scale);
     crowns.setMatrixAt(index, matrix);
     color.set(palette[Math.floor(tree.tone * palette.length)]);
@@ -419,6 +421,15 @@ function makeTrees(data, sampleHeight) {
   trunks.instanceMatrix.needsUpdate = true;
   crowns.instanceMatrix.needsUpdate = true;
   treesGroup.add(trunks, crowns);
+  return trees;
+}
+
+// When the camera is inside or beneath any crown, hide every tree so the view is not blocked. The
+// meshes are hidden rather than the group, so the Trees layer switch keeps its own state.
+function hideTreesAroundCamera(trees) {
+  const { x, y, z } = camera.position;
+  const among = trees.some((tree) => y < tree.top + 0.5 && y > tree.y - 1 && Math.hypot(x - tree.x, z - tree.z) < Math.max(tree.radius, tree.depth) + 0.5);
+  for (const mesh of treesGroup.children) mesh.visible = !among;
 }
 
 function makePad(data, sampleHeight) {
@@ -699,7 +710,7 @@ try {
   makeParcelBoundary(data, sampleHeight);
   makeContours(data);
   makeClearing(data, sampleHeight);
-  makeTrees(data, sampleHeight);
+  const trees = makeTrees(data, sampleHeight);
   makePad(data, sampleHeight);
   makeRoadContext(data, ground.height);
   makeEasements(data, ground.height);
@@ -877,6 +888,7 @@ try {
   renderer.setAnimationLoop(() => {
     controls.update();
     updateOverlays();
+    hideTreesAroundCamera(trees);
     renderer.render(scene, camera);
   });
 } catch (cause) {
