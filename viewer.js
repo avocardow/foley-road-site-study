@@ -475,6 +475,7 @@ try {
       if (selectedReference === reference) {
         reference.group.visible = false;
         button.setAttribute("aria-pressed", "false");
+        button.lastElementChild.textContent = "";
         selectedReference = null;
         if (savedView) {
           camera.position.copy(savedView.position);
@@ -492,7 +493,9 @@ try {
       if (!selectedReference) savedView = { position: camera.position.clone(), up: camera.up.clone(), target: controls.target.clone(), maxDistance: controls.maxDistance, far: camera.far, enableRotate: controls.enableRotate };
       references.forEach((candidate) => {
         candidate.group.visible = candidate === reference;
-        document.getElementById(candidate.buttonId).setAttribute("aria-pressed", String(candidate === reference));
+        const candidateButton = document.getElementById(candidate.buttonId);
+        candidateButton.setAttribute("aria-pressed", String(candidate === reference));
+        candidateButton.lastElementChild.textContent = candidate === reference ? "✓" : "";
       });
       selectedReference = reference;
       controls.enableRotate = false;
