@@ -766,8 +766,42 @@ try {
       if (a.footprints && b.footprints && footprintsOverlap(a.footprints(data), b.footprints(data))) clashes.push(`${a.title} and ${b.title} overlap on the site.`);
     }));
     conceptDetails.innerHTML = clashes.map((clash) => `<p class="concept-clash">${clash}</p>`).join("") + (chosen.length
-      ? chosen.map(([category, option]) => `<div class="concept-details"><div class="concept-title">${category.label} · ${option.title}</div><ul>${option.stats.map((stat) => `<li>${stat}</li>`).join("")}</ul>${option.notes.map((note) => `<p>${note}</p>`).join("")}</div>`).join("")
+      ? chosen.map(([category, option]) => `<div class="concept-details"><div class="concept-title">${category.label} · ${option.title}</div><ul>${option.stats.map((stat) => `<li>${stat}</li>`).join("")}</ul>${option.viewpoints ? `<div class="viewpoints"><span>Step inside</span>${option.viewpoints(data).map((view, index) => `<button class="view" data-option="${option.id}" data-index="${index}">${view.label}</button>`).join("")}</div>` : ""}${option.notes.map((note) => `<p>${note}</p>`).join("")}</div>`).join("")
       : `<p class="concept-empty">Existing site only. Use the arrows below the model, or ← → keys, to try concepts.</p>`);
+    conceptDetails.querySelectorAll("button[data-option]").forEach((button) => button.addEventListener("click", () => {
+      const option = categories.flatMap((category) => category.options).find((candidate) => candidate.id === button.dataset.option);
+      stepInside(option.viewpoints(data)[Number(button.dataset.index)]);
+    }));
+  };
+  // Eye-level view inside a concept: a wide lens, a near clipping plane, and orbiting around a point
+  // just ahead, so dragging looks around. Reset and Top view restore the site camera.
+  // Site-scale markers (boundary line, easement labels) draw through walls, so hide them inside.
+  const siteMarkers = [boundaryGroup, easementGroup];
+  let hiddenMarkers = null;
+  const stepInside = ({ position, target }) => {
+    if (!hiddenMarkers) {
+      hiddenMarkers = siteMarkers.map((group) => group.visible);
+      siteMarkers.forEach((group) => { group.visible = false; });
+    }
+    const eye = new THREE.Vector3(...position), ahead = new THREE.Vector3(...target).sub(eye).setLength(0.4);
+    camera.fov = 70;
+    camera.near = 0.05;
+    camera.updateProjectionMatrix();
+    camera.up.set(0, 1, 0);
+    controls.minDistance = 0.01;
+    controls.maxPolarAngle = Math.PI * 0.95;
+    controls.enableRotate = true;
+    controls.target.copy(eye).add(ahead);
+    camera.position.copy(eye);
+    controls.update();
+  };
+  const leaveInside = () => {
+    if (hiddenMarkers) siteMarkers.forEach((group, index) => { group.visible = hiddenMarkers[index]; });
+    hiddenMarkers = null;
+    camera.fov = 38;
+    camera.near = 1;
+    camera.updateProjectionMatrix();
+    controls.minDistance = 18;
   };
   // Each category cycles None → option 1 → … → last → None.
   const step = (categoryId, direction) => {
@@ -816,6 +850,7 @@ try {
   const homeOffset = new THREE.Vector3(93, 120, 165).sub(homeTarget);
   // Pull back on portrait screens so the whole parcel stays in frame.
   const goHome = () => {
+    leaveInside();
     camera.up.set(0, 1, 0);
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.enableRotate = true;
@@ -841,6 +876,7 @@ try {
   const parcelSpan = [Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)];
   // North-up plan view. A tiny southward offset keeps OrbitControls' azimuth defined.
   const goTop = () => {
+    leaveInside();
     const distance = Math.max(parcelSpan[1], parcelSpan[0] / camera.aspect) * 1.3 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
     controls.target.set(parcelCenter[0], homeTarget.y, parcelCenter[1]);
     camera.up.set(0, 0, -1);

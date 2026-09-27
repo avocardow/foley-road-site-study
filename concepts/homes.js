@@ -5,7 +5,7 @@
 // separate secondary dwelling under the 60 m² cap, as far from the siblings' building as the
 // pocket allows. Everything is single level and inside the existing clearing.
 // Positions were checked against the site model; see research/three-homes-layouts.md.
-import { buildParts, costRange, footprint } from "./building.js";
+import { buildParts, costRange, footprint, pointAt } from "./building.js";
 
 const home = (name, origin, width, length, floorLevel, rooms, extra = {}) => ({ role: name, origin, width, length, floorLevel, rooms, ...extra });
 
@@ -21,6 +21,7 @@ const DRIVE_BETWEEN = {
     [[52.72, 15.19], [55.13, 15.84], [53.84, 20.67], [51.42, 20.02]],
   ],
   cars: [{ s: 41.85, d: 12.6 }, { s: 45.15, d: 12.6 }, { s: 53.28, d: 17.93, rotation: -15 }],
+  people: [{ s: 47.4, d: 18.4 }, { s: 52.4, d: 3.4 }],
 };
 
 const layouts = [
@@ -38,7 +39,7 @@ const layouts = [
         { name: "Entry + shared ldry", kind: "laundry", x: 2.4, y: 3.3, w: 1.6, h: 2.2 },
         { name: "Kitchen · living · dining", kind: "living", x: 0, y: 5.5, w: 4, h: 2.9 },
         { name: "", kind: "kitchen", x: 3.35, y: 5.5, w: 0.65, h: 2.6 },
-      ], { partyWalls: [[4, 0, 4, 10.8]], postSpan: 4.1, openings: [[1.1, 8.4, 3.9, 8.4]] }),
+      ], { partyWalls: [[4, 0, 4, 10.8]], postSpan: 4.1, openings: [[1.1, 8.4, 3.9, 8.4]], people: [{ x: 2.3, y: 9.6 }] }),
       // The Wide's living room continues into the back notch, trimmed to stay 10 m from the waterway.
       home("A", [40.5, 12.9], 3, 2.4, 31.0, [
         { name: "Living + dining", kind: "living", x: 0, y: 0, w: 3, h: 2.4 },
@@ -49,7 +50,7 @@ const layouts = [
         { name: "Study nook", kind: "store", x: 2.4, y: 3.3, w: 1.6, h: 2.2 },
         { name: "Kitchen · living · dining", kind: "living", x: 0, y: 5.5, w: 4, h: 5.3 },
         { name: "", kind: "kitchen", x: 0, y: 5.5, w: 0.65, h: 3 },
-      ], { postSpan: 4.1, decks: [{ x: -2, y: 10.8, w: 6, h: 2.4 }] }),
+      ], { postSpan: 4.1, decks: [{ x: -2, y: 10.8, w: 6, h: 2.4 }], people: [{ x: 1.3, y: 9.8 }, { x: 2.6, y: 12.1 }] }),
       home("F", [54.21, 6.9], 4.4, 13.5, 31.1, [
         { name: "Bed 1", kind: "bed", x: 0, y: 0, w: 4.4, h: 3.25 },
         { name: "Kitchen · living · dining", kind: "living", x: 0, y: 3.25, w: 4.4, h: 4.95 },
@@ -57,7 +58,14 @@ const layouts = [
         { name: "Hall + ldry", kind: "laundry", x: 0, y: 8.2, w: 1.8, h: 2.2 },
         { name: "Bath", kind: "bath", x: 1.8, y: 8.2, w: 2.6, h: 2.2 },
         { name: "Bed 2", kind: "bed", x: 0, y: 10.4, w: 4.4, h: 3.1 },
-      ], { rotation: -15, postSpan: 4.5, decks: [{ x: 0, y: -2, w: 4.4, h: 2 }] }),
+      ], { rotation: -15, postSpan: 4.5, decks: [{ x: 0, y: -2, w: 4.4, h: 2 }], people: [{ x: 3.2, y: 4.6 }, { x: 1.1, y: 7.5 }] }),
+    ],
+    // Eye-level views: part index into homes, then points in that part's own coordinates.
+    viewpoints: [
+      { label: "Wide living", part: 0, from: [0.7, 5.8], to: [2.2, 10.5] },
+      { label: "Flex living", part: 2, from: [3.3, 5.8], to: [1.8, 10.8] },
+      { label: "Couple's living", part: 3, from: [3.8, 7.9], to: [1.2, 3.4] },
+      { label: "North deck", part: 2, from: [-1.2, 12.6], to: [9, 11] },
     ],
     notes: [
       "Your building sits as far left as it can go: its back-left corner is on the 10 m waterway buffer line, and angling it only swings the back further right. The couple's home is angled 15° with its front swung right into the free front-right corner, and its side deck is removed. That opens a dead-straight 3 m driveway from the existing entrance to a turning court at the bottom: about 19 m at a 20% average grade, with no bends, about 0.8 m clear of your building and 0.5 m clear of theirs. It separates the two households, and no shed, carport, or garage is needed.",
@@ -66,6 +74,7 @@ const layouts = [
       "Your Wide 8.4 and Flex 10.8 run side by side down the slope, sharing a long wall under one roof. Posts stand only on the long edges, so the car bays underneath stay clear.",
       "Open plan: in every home only the bedrooms and bathroom are enclosed. Each bedroom sits at the road end; the rest opens into one kitchen, living, and dining space. There are no corridors — the passage beside each bathroom doubles as the entry and shared laundry (Wide), a study nook (Flex), or the hall and laundry to the second bedroom (couple's home). Kitchen benches back onto the shared wall, so both kitchens, the shared laundry, and the Flex bathroom share one plumbing wall.",
       "Sized against recognised minimums (NSW Apartment Design Guide 4D; Livable Housing Design Standard 2022): every bedroom is at least 3 m deep inside so a queen bed and robe fit, bathrooms are 2.4 × 2.2 m or larger so the 900 × 1200 mm toilet space and a step-free shower fit, and the couple's living room is 4 m wide inside.",
+      "For scale, the model shows furniture at real sizes (queen beds, a three-seat sofa, a four-seat table, kitchen benches, bathroom fittings) and 1.75 m figures. Use the Step inside buttons for an eye-level view from each living room and the north deck; drag to look around, and Reset to come back out.",
       "Floor areas: Wide 41 m² (its living room continues into the back notch, trimmed to stay 10 m from the waterway, which also roofs over your car); Flex 43 m²; couple's home 59.4 m² (4.4 m wide, just under the 60 m² secondary-dwelling cap). Decks: a shared 6 × 2.4 m north deck off your building, over the turning court (it doubles as cover for cars), and a 4.4 × 2 m entry deck at the front of the couple's home.",
       "The couple's Family 13.5 runs down the right-hand edge, angled away from your building at the front. Visitors park in the turning court.",
       "The court and bays sit in the mapped overland flow path: use permeable paving or gravel with a spoon drain, and confirm with a civil engineer.",
@@ -94,6 +103,11 @@ export default layouts.map((layout) => {
     ],
     notes: [...layout.notes, approval, ...shared],
     footprints: (data) => parts.map((part) => footprint(data, part)),
+    viewpoints: (data) => (layout.viewpoints ?? []).map(({ label, part, from, to }) => {
+      const spec = parts[part], eye = spec.floorLevel + 1.6;
+      const [fx, fz] = pointAt(data, spec, ...from), [tx, tz] = pointAt(data, spec, ...to);
+      return { label, position: [fx, eye, fz], target: [tx, eye, tz] };
+    }),
     build: (context) => buildParts(context, [...parts, layout.site]),
   };
 });

@@ -50,6 +50,10 @@ export function buildHouse({ THREE, data, groundHeight, drapePolygon }, spec) {
       mesh.rotation.y = Math.atan2(fx - px, fz - pz);
       group.add(mesh);
     }
+    for (const person of spec.people ?? []) {
+      const [px, pz] = toXZ([person.s, person.d]);
+      group.add(makePerson(THREE, px, groundHeight(px, pz), pz));
+    }
     return group;
   }
 
@@ -117,6 +121,8 @@ export function buildHouse({ THREE, data, groundHeight, drapePolygon }, spec) {
   const deckMaterial = new THREE.MeshStandardMaterial({ color: COLORS.deck, roughness: 0.9, transparent: !!ghost, opacity: ghost ? 0.5 : 1 });
   for (const deck of spec.decks ?? []) group.add(place(new THREE.Mesh(new THREE.BoxGeometry(deck.w, 0.15, deck.h), deckMaterial), deck.x + deck.w / 2, deck.y + deck.h / 2, floor - 0.075));
 
+  if (!ghost) addInterior();
+
   // See-through walls and a skillion roof, so the plan stays readable from above.
   const wallMaterial = new THREE.MeshStandardMaterial({ color: ghost ? "#cfd6e6" : "#f1efe8", transparent: true, opacity: ghost ? 0.18 : 0.4, side: THREE.DoubleSide, depthWrite: false });
   const edgeMaterial = new THREE.LineBasicMaterial({ color: ghost ? "#aab8d6" : "#ffffff" });
@@ -139,6 +145,79 @@ export function buildHouse({ THREE, data, groundHeight, drapePolygon }, spec) {
   roofHolder.add(roofEdges);
   group.add(roofHolder);
   return finish();
+
+  // Furniture at real sizes, faint walls around bedrooms and bathrooms, and people for scale.
+  function addInterior() {
+    const box = (x, y, w, h, height, color, lift = 0, opacity = 1) => {
+      const material = new THREE.MeshStandardMaterial({ color, roughness: 0.8, transparent: opacity < 1, opacity, depthWrite: opacity === 1 });
+      group.add(place(new THREE.Mesh(new THREE.BoxGeometry(w, height, h), material), x + w / 2, y + h / 2, floor + lift + height / 2));
+    };
+    const strips = spec.rooms.filter((room) => room.kind === "kitchen" && !room.name);
+    for (const room of spec.rooms) {
+      const { x, y, w, h } = room;
+      if (room.kind === "bed") {
+        // Queen bed with its head on an outside wall where possible, and a robe on one side.
+        const headHigh = y + h >= length - 0.01 && y > 0;
+        const bedX = x + w / 2 + (w > 3.4 ? 0.3 : 0) - 0.765;
+        const bedY = headHigh ? y + h - 0.15 - 2.03 : y + 0.15;
+        box(bedX, bedY, 1.53, 2.03, 0.5, "#f4f1ea");
+        box(bedX - 0.05, headHigh ? y + h - 0.15 : y + 0.07, 1.63, 0.08, 1.0, "#8a7358");
+        box(x + 0.1, y + 0.3, 0.6, Math.min(2.1, h - 0.6), 2.1, "#b9a58a");
+      } else if (room.kind === "bath") {
+        box(x + w - 1.0, y + h - 1.0, 0.9, 0.9, 0.05, "#d8e4e6");
+        box(x + w - 1.0, y + h - 1.05, 0.9, 0.02, 2.0, "#bfe3ea", 0, 0.35);
+        box(x + 0.15, y + h - 0.75, 0.4, 0.65, 0.42, "#ffffff");
+        box(x + 0.1, y + 0.1, Math.min(0.9, w - 1.2), 0.5, 0.85, "#e9e4da");
+      } else if (room.kind === "laundry") {
+        box(x + w - 0.7, y + 0.1, 0.6, 0.6, 0.85, "#f5f5f5");
+        box(x + w - 0.7, y + 0.75, 0.6, 0.5, 0.9, "#e9e4da");
+      } else if (room.kind === "store" && /study/i.test(room.name)) {
+        box(x + 0.1, y + 0.2, 0.6, 1.2, 0.75, "#a07f5a");
+        box(x + 0.8, y + 0.55, 0.45, 0.45, 0.45, "#56606a");
+      } else if (room.kind === "kitchen" && !room.name) {
+        box(x, y, w, h, 0.9, "#d9d4c8");
+        box(x, y + h, w, 0.7, 1.8, "#c8ccd0");
+      } else if (room.kind === "living") {
+        // Keep a 1 m working aisle clear of any kitchen bench inside this room.
+        let x0 = x + 0.3, x1 = x + w - 0.3;
+        for (const strip of strips) {
+          if (strip.y >= y + h || strip.y + strip.h <= y) continue;
+          if (strip.x <= x + 0.01) x0 = Math.max(x0, strip.x + strip.w + 1.0);
+          else x1 = Math.min(x1, strip.x - 1.0);
+        }
+        const cx = (x0 + x1) / 2;
+        const dining = (tableY) => {
+          box(cx - 0.4, tableY, 0.8, 1.2, 0.75, "#9c7b55");
+          for (const [dx, dy] of [[-0.75, 0.15], [-0.75, 0.65], [0.35, 0.15], [0.35, 0.65]]) box(cx + dx, tableY + dy, 0.4, 0.4, 0.45, "#6d5a45");
+        };
+        const lounge = (sofaY) => {
+          box(cx - 1.0, sofaY, 2.0, 0.9, 0.8, "#6f8a78");
+          box(cx - 0.5, sofaY - 1.0, 1.0, 0.5, 0.4, "#9c7b55");
+        };
+        // A short room that continues another living space takes the dining table.
+        if (h < 3 && w < 3.5) dining(y + (h - 1.2) / 2);
+        else if (h >= 4.5) { dining(y + 0.6); lounge(y + h - 1.2); }
+        else lounge(y + h - 1.2);
+      }
+    }
+    // Faint partitions around enclosed rooms, leaving the building's outside walls to the wall box.
+    const partition = new THREE.MeshStandardMaterial({ color: "#e8e4dc", transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false });
+    for (const room of spec.rooms.filter((candidate) => candidate.kind === "bed" || candidate.kind === "bath")) {
+      const { x, y, w, h } = room;
+      const edges = [[x, y, x + w, y], [x + w, y, x + w, y + h], [x, y + h, x + w, y + h], [x, y, x, y + h]];
+      for (const [x0, y0, x1, y1] of edges) {
+        const outside = (x0 === x1 && (x0 <= 0.01 || x0 >= width - 0.01)) || (y0 === y1 && (y0 <= 0.01 || y0 >= length - 0.01));
+        if (outside) continue;
+        const along = Math.hypot(x1 - x0, y1 - y0);
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(x0 === x1 ? 0.09 : along, 2.6, x0 === x1 ? along : 0.09), partition);
+        group.add(place(wall, (x0 + x1) / 2, (y0 + y1) / 2, floor + 1.3));
+      }
+    }
+    for (const person of spec.people ?? []) {
+      const [px, pz] = at(person.x, person.y);
+      group.add(makePerson(THREE, px, floor, pz));
+    }
+  }
 
   function finish() {
   if (spec.posts === false) return addCars();
@@ -174,6 +253,24 @@ export function buildHouse({ THREE, data, groundHeight, drapePolygon }, spec) {
   }
   return group;
   }
+}
+
+// A 1.75 m figure for scale, standing at the given floor or ground level.
+function makePerson(THREE, x, level, z) {
+  const person = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial({ color: "#e07a5f", roughness: 0.7 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 1.12, 4, 10), material);
+  body.position.y = 0.75;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 12, 10), material);
+  head.position.y = 1.635;
+  person.add(body, head);
+  person.position.set(x, level, z);
+  return person;
+}
+
+// A point in a building's own coordinates, as site (x, z).
+export function pointAt(data, spec, x, y) {
+  return localFrame(siteFrame(data), spec)(x, y);
 }
 
 // Several parts (a later wing, an upper floor) combined into one concept group.
