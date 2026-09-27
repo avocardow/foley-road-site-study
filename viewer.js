@@ -873,9 +873,49 @@ try {
   };
   document.getElementById("reset").addEventListener("click", resetView);
   resetView();
+
+  // Double-tap to zoom on touch screens, as in map apps: halve the distance to the target and move
+  // halfway towards the tapped spot on the ground, animated. Mouse input is left to OrbitControls.
+  const raycaster = new THREE.Raycaster();
+  const tapPoint = new THREE.Vector2();
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  let zoomTween = null, pressed = null, lastTap = null;
+  const zoomTowards = (clientX, clientY) => {
+    const rect = canvas.getBoundingClientRect();
+    tapPoint.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    raycaster.setFromCamera(tapPoint, camera);
+    groundPlane.constant = -controls.target.y;
+    const hit = raycaster.ray.intersectPlane(groundPlane, new THREE.Vector3()) ?? controls.target.clone();
+    const offset = camera.position.clone().sub(controls.target);
+    const scale = Math.max(controls.minDistance / offset.length(), 0.5);
+    const toTarget = controls.target.clone().lerp(hit, 1 - scale);
+    zoomTween = { start: performance.now(), fromTarget: controls.target.clone(), fromPosition: camera.position.clone(), toTarget, toPosition: toTarget.clone().add(offset.multiplyScalar(scale)) };
+  };
+  const stepZoom = (now) => {
+    if (!zoomTween) return;
+    const t = Math.min(1, (now - zoomTween.start) / 280), eased = 1 - (1 - t) ** 3;
+    controls.target.lerpVectors(zoomTween.fromTarget, zoomTween.toTarget, eased);
+    camera.position.lerpVectors(zoomTween.fromPosition, zoomTween.toPosition, eased);
+    if (t === 1) zoomTween = null;
+  };
+  canvas.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse") return;
+    pressed = event.isPrimary ? { x: event.clientX, y: event.clientY, time: event.timeStamp } : null;
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    if (event.pointerType === "mouse" || !pressed || !event.isPrimary) return;
+    const quick = event.timeStamp - pressed.time < 250 && Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y) < 10;
+    pressed = null;
+    if (!quick) { lastTap = null; return; }
+    if (lastTap && event.timeStamp - lastTap.time < 320 && Math.hypot(event.clientX - lastTap.x, event.clientY - lastTap.y) < 30) {
+      lastTap = null;
+      zoomTowards(event.clientX, event.clientY);
+    } else lastTap = { x: event.clientX, y: event.clientY, time: event.timeStamp };
+  });
   window.addEventListener("resize", fit);
   loading.hidden = true;
-  renderer.setAnimationLoop(() => {
+  renderer.setAnimationLoop((now) => {
+    stepZoom(now);
     controls.update();
     updateOverlays();
     hideTreesAroundCamera(trees);
