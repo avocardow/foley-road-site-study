@@ -424,12 +424,12 @@ function makeTrees(data, sampleHeight) {
   return trees;
 }
 
-// When the camera is inside or beneath any crown, hide every tree so the view is not blocked. The
-// meshes are hidden rather than the group, so the Trees layer switch keeps its own state.
-function hideTreesAroundCamera(trees) {
-  const { x, y, z } = camera.position;
-  const among = trees.some((tree) => y < tree.top + 0.5 && y > tree.y - 1 && Math.hypot(x - tree.x, z - tree.z) < Math.max(tree.radius, tree.depth) + 0.5);
-  for (const mesh of treesGroup.children) mesh.visible = !among;
+// When the camera is below the top of the tallest tree, anywhere on or off the lot, hide every tree
+// so the view is never blocked. The meshes are hidden rather than the group, so the Trees layer
+// switch keeps its own state.
+function hideTreesBelowCanopy(canopyTop) {
+  const below = camera.position.y < canopyTop;
+  for (const mesh of treesGroup.children) mesh.visible = !below;
 }
 
 function makePad(data, sampleHeight) {
@@ -710,7 +710,7 @@ try {
   makeParcelBoundary(data, sampleHeight);
   makeContours(data);
   makeClearing(data, sampleHeight);
-  const trees = makeTrees(data, sampleHeight);
+  const canopyTop = Math.max(...makeTrees(data, sampleHeight).map((tree) => tree.top));
   makePad(data, sampleHeight);
   makeRoadContext(data, ground.height);
   makeEasements(data, ground.height);
@@ -918,7 +918,7 @@ try {
     stepZoom(now);
     controls.update();
     updateOverlays();
-    hideTreesAroundCamera(trees);
+    hideTreesBelowCanopy(canopyTop);
     renderer.render(scene, camera);
   });
 } catch (cause) {
