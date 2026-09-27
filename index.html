@@ -92,13 +92,15 @@
         .north { top: 16px; left: 16px; right: auto; bottom: auto; }
         .scale { top: 24px; left: 58px; bottom: auto; }
         .toolbar { top: 12px; right: 12px; }
-        .viewpoints { top: 60px; left: 12px; max-width: calc(100% - 24px); }
+        .viewpoints { top: 60px; left: 12px; right: 12px; max-width: none; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+        .viewpoints::-webkit-scrollbar { display: none; }
+        .viewpoints > * { flex: none; }
         .tool { padding: 9px 12px; }
       }
       /* Portrait phones: the model on top, the panel scrolling below it. */
       @media (max-width: 850px) and (min-height: 501px) {
         body { height: auto; overflow: auto; }
-        main { height: auto; grid-template-columns: 1fr; grid-template-rows: 68svh auto; }
+        main { height: auto; grid-template-columns: 1fr; grid-template-rows: 85svh auto; }
         aside { border-left: 0; border-top: 1px solid var(--line); }
       }
       /* Landscape phones: the model fills the height, with a narrower panel beside it. */

@@ -840,7 +840,7 @@ try {
     controls.maxPolarAngle = Math.PI * 0.48;
     controls.enableRotate = true;
     controls.target.copy(homeTarget);
-    camera.position.copy(homeTarget).addScaledVector(homeOffset, Math.max(1, 0.95 / camera.aspect));
+    camera.position.copy(homeTarget).addScaledVector(homeOffset, Math.max(1, 0.78 / camera.aspect));
     controls.update();
   };
   goHome();
