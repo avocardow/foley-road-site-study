@@ -6,7 +6,7 @@ Worked out 2026-09-27 in the site model. The brief: three single-level homes in 
 
 Sizes are custom, for a builder to build to spec. They borrow from small-home plans: the Outhaus range (below) and the products in [three-homes.md](three-homes.md). The approval rules and precedents are in [three-homes.md](three-homes.md) and [planning-rules.md](planning-rules.md).
 
-All seven layouts are in the site viewer under **Three homes · one level**, with room plans drawn on each floor. Their source is `concepts/three-homes.js`.
+Only the layout that meets the final brief is in the site viewer, under **Homes**: A (driveway between, parking under). Its source is `concepts/homes.js`. The other arrangements below were explored and are kept here for the record. They were removed from the viewer because they don't meet the brief: the siblings' homes are not under one roof, the couple's home is over 60 m² or attached, the homes are closer together, a building has two storeys, or there is no room for a driveway to parking under the homes.
 
 ## Owner's scheme: Flex 10.8 + Wide 8.4 under one roof, Family 13.5 separate
 
@@ -20,18 +20,27 @@ A search of every position and orientation found **34,592 valid arrangements**. 
 
 | Arrangement | Siblings' building | Couple's home | Gap | Notes |
 |---|---|---|---|---|
-| **A · Your pair in front, friends behind** | 8 × 10.8 m rectangle along the road (Wide at the front, Flex behind, laundry notch filled), 87 m², floor 30.9 m | Family 13.5 across the back, floor 29.0 m | **5.0 m** | The most private: the couple's floor is about 1.9 m lower, and its deck faces east. The siblings' deck faces the garden on the east side. |
-| B · Your pair on the left, friends on the right | Wide and Flex side by side down the slope, bathrooms back to back, 77 m², floor 30.7 m | Family 13.5 down the right-hand edge, floor 30.9 m | 4.25 m | Both buildings face north. The notch sits in the waterway buffer, so it stays open. |
-| C · Friends on the left, your pair on the right | Flex along the front and Wide behind, on the high ground by the parking, 77 m², floor 31.2 m | Family 13.5 down the left-hand edge, floor 30.4 m | 3.0 m | The least private of the three. |
+| Your pair in front, friends behind (removed: no room for a driveway) | 8 × 10.8 m rectangle along the road (Wide at the front, Flex behind, laundry notch filled), 87 m², floor 30.9 m | Family 13.5 across the back, floor 29.0 m | **5.0 m** | The most private: the couple's floor is about 1.9 m lower, and its deck faces east. The siblings' deck faces the garden on the east side. |
+| Your pair on the left, friends on the right (became viewer option A, with the driveway) | Wide and Flex side by side down the slope, bathrooms back to back, 77 m², floor 30.7 m | Family 13.5 down the right-hand edge, floor 30.9 m | 4.25 m | Both buildings face north. The notch sits in the waterway buffer, so it stays open. |
+| Friends on the left, your pair on the right (removed: only 3 m apart) | Flex along the front and Wide behind, on the high ground by the parking, 77 m², floor 31.2 m | Family 13.5 down the left-hand edge, floor 30.4 m | 3.0 m | The least private of the three. |
 
-### Driveway between, parking under (now option A in the viewer)
+### Driveway between, parking under (viewer option A)
 
-This is the side-by-side arrangement with the driveway run down the 4.25 m corridor between the two homes:
-- **Driveway:** from the pad at the road (about 32.0 m) to a turning court at the bottom (about 28.3 m). It is about 19.5 m long at an **18% average**, and 3.2 m wide.
-- **Parking:** level bays cut into the slope at about 28.3 m. Two cars sit side by side under the low end of the siblings' building, one under the Wide and one under the Flex. One car sits under the couple's home, beside the driveway.
+This is the side-by-side arrangement with the driveway run down the corridor between the two homes. The siblings' building is 0.25 m further left than in the table above, as far left as the waterway buffer allows: angling it only swings its back further right. The corridor is now 4.5 m wide.
+- **Driveway:** uses the **existing entrance** and runs **dead straight** to a turning court at the bottom (about 28.3 m). It is about 19 m long at a 20% average grade, 3 m wide, and about 0.8 m clear of each building.
+  - To make room, the couple's home is angled 15°, with its front swung right into the free front-right corner, and its side deck is removed. The gap between the homes becomes 4.7 m.
+  - A search of angles and positions picked this as the arrangement with the most clearance either side of a straight driveway that starts on the existing crossover.
+  - Angling the siblings' building as well (front to the left) was tested. Its front can't move further left because of the waterway buffer, so its back swings towards the couple's home and the gap drops to about 3.8 m. It stays square to the road.
+  - The earlier versions were rejected. One made an S-bend off the existing pad. The other needed a new crossover lined up with the corridor, which means building a second crossover and removing the existing one.
+  - The dog-fence gate sits where the driveway crosses the fence line.
+- **Parking:** level bays cut into the slope at about 28.3 m. Two cars sit side by side under the low end of the siblings' building, one under the Wide and one under the Flex. One car sits under the back of the couple's home, reached from the court.
 - **Headroom:** 2.35–2.45 m, with floors raised about 0.3 m (siblings 31.0 m, couple 31.1 m).
 - **Earthworks:** up to about 0.8 m of cut at the uphill end of the bays, retained by a low wall, and a little fill at the back of the court.
 - **Posts** stand only on the buildings' long edges, so the bays stay clear.
+- **Open plan:** in every home only the bedrooms and bathroom are enclosed. Each bedroom sits at the road end, and the rest is one kitchen, living and dining space facing north.
+  - There are no corridors: the passage beside each bathroom doubles as the entry and shared laundry (Wide), a study nook (Flex), or the hall and laundry to the second bedroom (Family 13.5).
+  - Kitchen benches back onto the shared wall, so the two kitchens, the shared laundry and the Flex bathroom share one plumbing wall.
+  - Open living areas: Wide about 13 m², Flex about 22 m², Family 13.5 about 22 m².
 
 This removes the need for a shed, carport or garage. The driveway also physically separates the two households.
 
@@ -74,7 +83,9 @@ These proportions carry over directly:
 - **Bars 3.4–4.2 m wide** span simply. One-bedroom homes run bedroom, then bathroom, then living.
 - **Two-bedroom narrow homes** put a bedroom at each end.
 
-## The seven layouts
+## The seven earlier layouts (explored, not in the viewer)
+
+These came from the first brief: separate homes, with the couple taking about half the floor area. They don't meet the final brief, which puts the siblings under one roof and caps the couple's home at 60 m².
 
 Areas are external floor areas. The cost ranges are indicative only: kit plus licensed builder, from [build-costs.md](build-costs.md). Each group's range includes a full set of site costs, so adding the two ranges together overstates the total by about $30k–$70k.
 

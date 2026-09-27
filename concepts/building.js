@@ -45,7 +45,8 @@ export function buildHouse({ THREE, data, groundHeight, drapePolygon }, spec) {
       const [px, pz] = toXZ([car.s, car.d]);
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(CAR.width, CAR.height, CAR.length), carMaterial);
       mesh.position.set(px, groundHeight(px, pz) + CAR.height / 2 + 0.1, pz);
-      const [fx, fz] = toXZ([car.s, car.d + 1]);
+      const turn = (car.rotation ?? 0) * Math.PI / 180;
+      const [fx, fz] = toXZ([car.s + Math.sin(turn), car.d + Math.cos(turn)]);
       mesh.rotation.y = Math.atan2(fx - px, fz - pz);
       group.add(mesh);
     }
@@ -190,4 +191,12 @@ function localFrame(toXZ, spec) {
 export function clearanceAt({ data, groundHeight }, spec, x, y) {
   const [px, pz] = localFrame(siteFrame(data), spec)(x, y);
   return spec.floorLevel - FLOOR_DEPTH - groundHeight(px, pz);
+}
+
+// Indicative all-in cost from research/build-costs.md (kit + licensed builder route, September 2026):
+// fixed site and soft costs plus a per-m² building rate, with 10% (low) or 15% (mid) contingency.
+export function costRange(area) {
+  const low = (27800 + 3145 * area) * 1.10, mid = (63000 + 4090 * area) * 1.15;
+  const k = (value) => `$${Math.round(value / 5000) * 5}k`;
+  return `${k(low)} (low) – ${k(mid)} (mid)`;
 }

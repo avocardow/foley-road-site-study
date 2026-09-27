@@ -3,13 +3,15 @@
 // 4.5 m inside the boundary so the gate has a 7 m holding bay from the carriageway edge (2.5 m verge).
 // Figures were measured against the LiDAR terrain and council overlays in site-data.json.
 
+import { siteFrame } from "./building.js";
+
 const FENCE_HEIGHT = 1.8;
 const GATE_WIDTH = 4;
 const CAR = { length: 4.9, width: 1.9, height: 1.5 };
 
 const shared = [
   "Gate and bay: the gate sits 4.5 m inside the boundary, 7 m from the Foley Road edge. A large car or ute (about 5.3 m) waits fully off the road while it opens; leaving, the car stops in the bay while the gate closes behind it, then pulls out. Use a sliding gate running inside the fence, or leaves that swing inward (downhill), never out over the bay. Automate with auto-close and a safety beam.",
-  "The bay falls about 20% from the road to the gate; regrading the existing pad flatter would make waiting easier.",
+  "The gate sits where the Homes driveway crosses the fence line, on the straight run from the existing entrance. The bay falls about 20% from the road to the gate, the natural slope. Where the fence meets the siblings' building, the building's front wall closes that stretch.",
   "1.5–1.8 m high contains a Labrador. For the small dogs, keep mesh gaps under 50 mm near the ground and no gap under the gate. Use a koala-safe design: nothing for koalas to climb on the outside, or a smooth band.",
   "Where the fence crosses drainage easement A or the overland flow path, use open mesh so water passes, and get council consent for the easement crossing.",
   "Lines through the forest need hand-dug posts between trunks and no clearing; tree positions in the model are illustrative, so walk the line on site.",
@@ -64,7 +66,8 @@ const options = [
 function build({ THREE, data, groundHeight, drapePolygon }, option) {
   const group = new THREE.Group();
   const polygon = option.polygon;
-  const padCenter = data.pad.reduce((center, [x, , z]) => [center[0] + x / data.pad.length, center[1] + z / data.pad.length], [0, 0]);
+  // The gate sits where the straight driveway from the existing entrance crosses the fence line.
+  const padCenter = siteFrame(data)([52.8, 3]);
 
   // The gate sits on the side nearest the driveway pad, where the pad centre projects onto it.
   let gate = null;

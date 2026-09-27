@@ -39,6 +39,6 @@ Each category lives in `concepts/` and is registered in `concepts/index.js` with
 
 Concept 1 compares dog-fence outlines: a clearing fit, the clearing plus the western forest to the neighbour boundary, a frontage-and-sides outline, and the whole lot. Every option keeps its Foley Road side 4.5 m inside the boundary, so the gate has a 7 m holding bay from the carriageway edge and a car never waits on the road.
 
-The **Three homes · one level** row has seven single-level layouts for three homes (`concepts/three-homes.js`). Stage 1 and Stage 2 home concepts (`concepts/stage-one.js`, `concepts/stage-two.js`) are drawn from room plans on a shared site plan, using the helper in `concepts/building.js`. If two selected concepts overlap on the site, the panel warns about it. Research behind them is in [`research/`](research/README.md).
+The **Homes** row (`concepts/homes.js`) holds the scheme that meets the brief: the siblings' Flex 10.8 + Wide 8.4 under one roof, and the couple's detached Family 13.5 as a secondary dwelling. It runs the driveway between the two buildings to level parking bays under their high-set ends. Buildings are drawn from room plans using the helper in `concepts/building.js`. If two selected concepts overlap on the site, the panel warns about it. Research behind them is in [`research/`](research/README.md).
 
 The page includes `noindex` metadata and a permissive `robots.txt` so crawlers can read the directive. Search engine exclusion is a request to crawlers, not access control; anyone with a public link may still open it.

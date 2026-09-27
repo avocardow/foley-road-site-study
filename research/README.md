@@ -8,9 +8,9 @@ Researched 2026-09-27 for the brief: a Stage 1 building for two siblings (each w
 | [build-costs.md](build-costs.md) | South East Queensland build costs, suppliers, site extras, and budget tables for three build routes |
 | [design-precedents.md](design-precedents.md) | Precedents, passive design for this site, and five Stage 1 and two Stage 2 layout concepts |
 | [three-homes.md](three-homes.md) | Tiny-home and modular plans, cluster precedents, and the approval framings for three homes on one lot |
-| [three-homes-layouts.md](three-homes-layouts.md) | Seven single-level three-home layouts measured in the site model, with Outhaus proportions and costs |
+| [three-homes-layouts.md](three-homes-layouts.md) | The final scheme (siblings' Flex 10.8 + Wide 8.4 under one roof, the couple's Family 13.5 detached) and the earlier layouts, measured in the site model |
 
-The concepts are modelled in the site viewer: use the **Stage 1 · siblings** and **Stage 2 · friends** rows in the bar at the bottom of the model. Their source is in `concepts/stage-one.js` and `concepts/stage-two.js`.
+The current concepts are in the site viewer under **Homes**, in the bar at the bottom of the model. Their source is `concepts/homes.js`, and [three-homes-layouts.md](three-homes-layouts.md) describes them. The Stage 1 and Stage 2 concepts described below were superseded by that scheme and removed from the viewer.
 
 ## What the research found
 
@@ -18,7 +18,7 @@ The concepts are modelled in the site viewer: use the **Stage 1 · siblings** an
 
 **Budget.** $300,000 all-in will not build the full two-wing building of about 108 m² on this site. The estimate is about $410k–$480k in the low case and $590k–$630k in the mid case. $300k buys about 45–75 m² ([build-costs.md](build-costs.md)). Owner-building is probably not allowed for attached multiple dwellings, but is worth asking QBCC about if Stage 1 is approved as one dwelling house.
 
-**Site plan** (measured in the site model). One layout fits everything together:
+**Site plan, first brief** (measured in the site model, now superseded). One layout fit everything together:
 
 - Stage 1 starts at the front left of the clearing and runs down the slope, 10 m from the mapped waterway (Biodiversity overlay AO1.2) and 7 m from Foley Road.
 - The floor sits at 31.0 m, level with the existing pad, so the front entry is step-free. The ground falls 3–4 m to the back, where two cars park underneath with 2.3–3.6 m headroom.
