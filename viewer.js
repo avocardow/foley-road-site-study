@@ -36,7 +36,8 @@ const contoursGroup = new THREE.Group();
 const clearingGroup = new THREE.Group();
 const treesGroup = new THREE.Group();
 const drivewayGroup = new THREE.Group();
-scene.add(terrainGroup, contoursGroup, clearingGroup, treesGroup, drivewayGroup);
+const accessGroup = new THREE.Group();
+scene.add(terrainGroup, contoursGroup, clearingGroup, treesGroup, drivewayGroup, accessGroup);
 
 function makeTerrain(data) {
   const position = new Float32Array(data.points.length * 3);
@@ -303,6 +304,78 @@ function makeDriveway(data, sampleHeight) {
   drivewayGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#aeb0ac", roughness: 0.94, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 })));
 }
 
+function makeRoadContext(data, sampleHeight) {
+  const points = data.boundary;
+  const signedArea = points.reduce((sum, [x, , z], i) => {
+    const [nx, , nz] = points[(i + 1) % points.length];
+    return sum + x * nz - nx * z;
+  }, 0);
+  const orientation = Math.sign(signedArea);
+  const ribbon = (a, b, from, to, material, elevationOffset = 0.25) => {
+    const dx = b[0] - a[0], dz = b[2] - a[2];
+    const length = Math.hypot(dx, dz);
+    const outwardX = orientation * dz / length, outwardZ = -orientation * dx / length;
+    const positions = [];
+    const steps = Math.ceil(length / 5);
+    for (let i = 0; i < steps; i++) {
+      const t0 = i / steps, t1 = (i + 1) / steps;
+      const section = (t, offset) => {
+        const x = a[0] + dx * t + outwardX * offset;
+        const z = a[2] + dz * t + outwardZ * offset;
+        const y = a[1] + (b[1] - a[1]) * t + elevationOffset;
+        return [x, y, z];
+      };
+      const p0 = section(t0, from), p1 = section(t1, from), p2 = section(t1, to), p3 = section(t0, to);
+      positions.push(...p0, ...p1, ...p2, ...p0, ...p2, ...p3);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.computeVertexNormals();
+    accessGroup.add(new THREE.Mesh(geometry, material));
+  };
+
+  const asphalt = new THREE.MeshStandardMaterial({ color: "#454a48", roughness: 0.98, side: THREE.DoubleSide });
+  const footpath = new THREE.MeshStandardMaterial({ color: "#b8b6aa", roughness: 1, side: THREE.DoubleSide });
+  // Boundary edge 1 follows Foley Road; edge 2 follows Nambour Connection Road.
+  const foleyStart = points[1], foleyEnd = points[2];
+  ribbon(foleyStart, foleyEnd, 2.8, 9.6, asphalt);
+  ribbon(foleyStart, foleyEnd, 0.25, 1.75, footpath, 0.32);
+  const highwayStart = points[2], highwayEnd = points[0];
+  ribbon(highwayStart, highwayEnd, 3.2, 18.2, asphalt);
+
+  // The existing apron sits close to Foley Road. This short private access crosses
+  // the roadside path and joins the apron at its road-facing end.
+  const foleyDx = foleyEnd[0] - foleyStart[0], foleyDz = foleyEnd[2] - foleyStart[2];
+  const foleyLengthSquared = foleyDx ** 2 + foleyDz ** 2;
+  const apronCenter = data.driveway.reduce((center, [x, , z]) => [center[0] + x / data.driveway.length, center[1] + z / data.driveway.length], [0, 0]);
+  const entryT = THREE.MathUtils.clamp(((apronCenter[0] - foleyStart[0]) * foleyDx + (apronCenter[1] - foleyStart[2]) * foleyDz) / foleyLengthSquared, 0, 1);
+  const entryX = foleyStart[0] + foleyDx * entryT, entryZ = foleyStart[2] + foleyDz * entryT;
+  const foleyOutwardX = orientation * foleyDz / Math.sqrt(foleyLengthSquared);
+  const foleyOutwardZ = -orientation * foleyDx / Math.sqrt(foleyLengthSquared);
+  const entryPoint = [entryX, 0, entryZ];
+  const apronJoin = data.driveway.reduce((nearest, point) => Math.hypot(point[0] - entryX, point[2] - entryZ) < Math.hypot(nearest[0] - entryX, nearest[2] - entryZ) ? point : nearest);
+  const accessPath = [
+    [entryX + foleyOutwardX * 6.2, 0, entryZ + foleyOutwardZ * 6.2],
+    entryPoint,
+    [apronJoin[0], 0, apronJoin[2]],
+  ];
+  const halfWidth = 1.55;
+  const verts = [];
+  for (let i = 0; i < accessPath.length - 1; i++) {
+    const a = accessPath[i], b = accessPath[i + 1];
+    const dx = b[0] - a[0], dz = b[2] - a[2], length = Math.hypot(dx, dz);
+    const nx = -dz / length * halfWidth, nz = dx / length * halfWidth;
+    const corners = [[a[0] + nx, a[2] + nz], [b[0] + nx, b[2] + nz], [b[0] - nx, b[2] - nz], [a[0] - nx, a[2] - nz]];
+    for (let j = 1; j < corners.length - 1; j++) {
+      for (const [x, z] of [corners[0], corners[j], corners[j + 1]]) verts.push(x, sampleHeight(x, z) + 0.32, z);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  geometry.computeVertexNormals();
+  drivewayGroup.add(new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: "#898c87", roughness: 0.95, side: THREE.DoubleSide })));
+}
+
 function toggle(buttonId, group) {
   const button = document.getElementById(buttonId);
   button.addEventListener("click", () => {
@@ -326,11 +399,13 @@ try {
   makeClearing(data, sampleHeight);
   makeTrees(data);
   makeDriveway(data, sampleHeight);
+  makeRoadContext(data, sampleHeight);
   toggle("terrain-toggle", terrainGroup);
   toggle("contour-toggle", contoursGroup);
   toggle("clearing-toggle", clearingGroup);
   toggle("trees-toggle", treesGroup);
   toggle("driveway-toggle", drivewayGroup);
+  toggle("road-toggle", accessGroup);
   document.getElementById("elevation-range").innerHTML = `${data.elevationRangeM[0]}–${data.elevationRangeM[1]} <span class="stat-unit">m</span>`;
   controls.target.set(0, (data.elevationRangeM[0] + data.elevationRangeM[1]) / 2, 0);
   camera.position.set(93, 120, 165);
