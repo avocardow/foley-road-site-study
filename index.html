@@ -59,6 +59,7 @@
       details { margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
       summary { cursor: pointer; color: var(--text); }
       details p { margin: 8px 0 0; }
+      details b { color: var(--text); font-weight: 600; }
       .sources { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; font-size: 12px; }
       .sources a { color: var(--accent); text-decoration: none; }
       .sources a:hover { text-decoration: underline; }
@@ -94,18 +95,42 @@
         <button class="layer" id="terrain-toggle" aria-pressed="true"><span class="swatch" style="background:linear-gradient(135deg,#586c56,#c4cf9e)"></span><span class="name">Terrain<small>LiDAR bare earth, true vertical scale</small></span><span class="check"></span></button>
         <button class="layer" id="contour-toggle" aria-pressed="true"><span class="swatch" style="background:#d9dbc5"></span><span class="name">1 m contours</span><span class="check"></span></button>
         <button class="layer" id="clearing-toggle" aria-pressed="true"><span class="swatch" style="background:#d6cf9c"></span><span class="name">Clearing<small>Traced from aerial</small></span><span class="check"></span></button>
-        <button class="layer" id="trees-toggle" aria-pressed="true"><span class="swatch" style="background:#486346"></span><span class="name">Trees<small>Canopy extent from aerial, trees illustrative</small></span><span class="check"></span></button>
+        <button class="layer" id="trees-toggle" aria-pressed="true"><span class="swatch" style="background:#486346"></span><span class="name">Trees<small>Retained canopy from aerial; trees illustrative</small></span><span class="check"></span></button>
         <button class="layer" id="pad-toggle" aria-pressed="true"><span class="swatch" style="background:#aeb0ac"></span><span class="name">Pad &amp; access<small>Concrete or rubble, 4.3 × 5.8 m</small></span><span class="check"></span></button>
 
         <h2>Context</h2>
         <button class="layer" id="road-toggle" aria-pressed="true"><span class="swatch" style="background:#454a48;box-shadow:inset 0 -3px #a89878"></span><span class="name">Roads<small>Foley 6.6 m, verge opposite · Nambour Connection 13.4 m</small></span><span class="check"></span></button>
-        <button class="layer" id="easement-toggle" aria-pressed="true"><span class="swatch" style="background:#f08a3c"></span><span class="name">Easements A &amp; B<small>Registered, 121 m² and 6 m²; confirm on title</small></span><span class="check"></span></button>
+        <button class="layer" id="easement-toggle" aria-pressed="true"><span class="swatch" style="background:#f08a3c"></span><span class="name">Easements A &amp; B<small>A: drainage, to Council (121 m²) · B: 6 m²</small></span><span class="check"></span></button>
+
+        <h2>Constraints · council mapping</h2>
+        <button class="layer" id="zone-toggle" aria-pressed="true"><span class="swatch" style="background:#8cf0a0"></span><span class="name">Building zone<small>Clearing outside setbacks and easement, ~341 m²</small></span><span class="check"></span></button>
+        <button class="layer" id="setback-toggle" aria-pressed="false"><span class="swatch" style="background:repeating-linear-gradient(45deg,#ddd 0 2px,transparent 2px 4px)"></span><span class="name">Setbacks<small>Assumed 6 m to roads, 1.5 m side</small></span><span class="check"></span></button>
+        <button class="layer" id="slope-toggle" aria-pressed="false"><span class="swatch" style="background:linear-gradient(90deg,#50be6e,#f0d25a,#e1554a)"></span><span class="name">Slope<small>Over 5 m: green &lt;10%, yellow 15–20%, red &gt;25%</small></span><span class="check"></span></button>
+        <button class="layer" id="flow-toggle" aria-pressed="false"><span class="swatch" style="background:#468cf5"></span><span class="name">Overland flow &amp; waterway<small>Covers 71% of the building zone</small></span><span class="check"></span></button>
+        <button class="layer" id="flood-toggle" aria-pressed="false"><span class="swatch" style="background:repeating-linear-gradient(45deg,#8caaff 0 2px,transparent 2px 4px)"></span><span class="name">Flood hazard buffer<small>Building regulation; floor level by search</small></span><span class="check"></span></button>
+        <button class="layer" id="landslide-toggle" aria-pressed="false"><span class="swatch" style="background:linear-gradient(90deg,#f0af46,#e64b37)"></span><span class="name">Landslide hazard<small>Moderate across the clearing, high elsewhere</small></span><span class="check"></span></button>
+        <button class="layer" id="bushfire-toggle" aria-pressed="false"><span class="swatch" style="background:#ff7d2d"></span><span class="name">Bushfire buffer<small>Medium hazard buffer, east of the clearing</small></span><span class="check"></span></button>
 
         <h2>Aerial photos</h2>
         <button class="layer" id="aerial-closeup-toggle" aria-pressed="false"><span class="swatch" style="background:#83a5c3"></span><span class="name">Parcel detail</span><span class="check"></span></button>
         <button class="layer" id="aerial-area-toggle" aria-pressed="false"><span class="swatch" style="background:#83a5c3"></span><span class="name">Wider area<small>Blends over the detail when both are on</small></span><span class="check"></span></button>
 
         <p class="note">Boundary, easements, and ground are from state data. Clearing, pad, and road edges are traced from the aerial. Trees are illustrative. Not a survey.</p>
+        <details open>
+          <summary>Building in the clearing</summary>
+          <p>No further clearing: the whole lot is mapped core koala habitat, Category B remnant vegetation, and native vegetation area.</p>
+          <p>The building zone is about 341 m². Ground falls 4.7 m across it (26.2 to 30.9 m), mostly at 15–25%. A 16 × 12 m or 18 × 10 m footprint parallel to Foley Road fits; two storeys fit under the 8.5 m height limit.</p>
+          <p>Most of it sits in the mapped overland flow path and flood buffer, and in moderate landslide hazard. Expect a geotechnical report and a council flood search for the minimum floor level. Tree roots at the clearing edge need an arborist's protection zones.</p>
+          <p>The land falls away from Foley Road: about 32.0 m at the road, 31.0 m at the existing pad, then 30.0 m to 26.6 m across a 16 × 12 m footprint.</p>
+          <p><b>Level pad:</b> about 70 m³ each of cut and fill with walls to 1.7 m, or 365 m³ of cut and 3.4 m walls at the low side, all within the flow path.</p>
+          <p><b>High-set:</b> a floor near 30 m leaves 3–3.5 m under the low side, and one living level plus roof fits the 8.5 m limit. Parking under the house needs the driveway to drop 3–4 m inside the clearing; a carport or garage by the pad at road level is simpler.</p>
+        </details>
+        <details>
+          <summary>Planning and services</summary>
+          <p>Low Density Residential zone, Woombye local plan. Height 8.5 m. Scenic route and major road buffer: expect Nambour Connection Road noise. Access from Foley Road only.</p>
+          <p>Water main and hydrant about 4 m from the lot; sewer pressure main about 1 m and gravity main about 9 m; council stormwater culvert about 6 m.</p>
+          <p>Lot created by RAL23/0026 (2023) and plan SP353650 (2026); OPW24/0061 approved stormwater, earthworks, and clearing. Check those approvals on Development.i for a building envelope or vegetation conditions, and confirm setbacks with a certifier.</p>
+        </details>
         <details>
           <summary>Accuracy and alignment</summary>
           <p>The parcel photo is tied to the cadastral corners; the wider photo is registered to it from shared ground features. White outlines in the photos are guides only. Photos lie on the state LiDAR terrain, 2 m outside the lot.</p>

@@ -512,6 +512,98 @@ function makeEasements(data, groundHeight) {
   }
 }
 
+// Council constraint overlays and design-scale slope, painted into textures draped on the lot.
+function makeConstraints(data, terrainGeometry, groundHeight) {
+  const { grid, masks, slopeClasses, stream } = data.constraints;
+  const scale = 4, count = grid.columns * grid.rows;
+  const decode = (text) => Uint8Array.from(atob(text), (char) => char.charCodeAt(0));
+  const position = terrainGeometry.getAttribute("position");
+  const uvs = new Float32Array(position.count * 2);
+  const x0 = grid.originX - grid.cellM / 2, z0 = grid.originZ - grid.cellM / 2;
+  for (let i = 0; i < position.count; i++) {
+    uvs[i * 2] = (position.getX(i) - x0) / (grid.columns * grid.cellM);
+    uvs[i * 2 + 1] = (position.getZ(i) - z0) / (grid.rows * grid.cellM);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", position);
+  geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+  geometry.setIndex(terrainGeometry.getIndex());
+
+  const layer = (paint) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = grid.columns * scale;
+    canvas.height = grid.rows * scale;
+    paint(canvas.getContext("2d"));
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.flipY = false;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    mesh.renderOrder = 5;
+    const group = new THREE.Group();
+    group.add(mesh);
+    scene.add(group);
+    return group;
+  };
+  const cell = (context, i) => context.fillRect((i % grid.columns) * scale, Math.floor(i / grid.columns) * scale, scale, scale);
+  const paintMask = (bits, fill, { hatch, edge } = {}) => (context) => {
+    const on = (i) => i >= 0 && i < count && bits[i >> 3] & (1 << (i & 7));
+    context.fillStyle = fill;
+    for (let i = 0; i < count; i++) if (on(i)) cell(context, i);
+    if (hatch) {
+      context.globalCompositeOperation = "source-atop";
+      context.strokeStyle = hatch;
+      context.lineWidth = 3;
+      for (let d = -context.canvas.height; d < context.canvas.width; d += 12) {
+        context.beginPath();
+        context.moveTo(d, 0);
+        context.lineTo(d + context.canvas.height, context.canvas.height);
+        context.stroke();
+      }
+      context.globalCompositeOperation = "source-over";
+    }
+    if (edge) {
+      context.fillStyle = edge;
+      for (let i = 0; i < count; i++) {
+        const column = i % grid.columns;
+        const outside = (column > 0 && !on(i - 1)) || (column < grid.columns - 1 && !on(i + 1)) || !on(i - grid.columns) || !on(i + grid.columns);
+        if (on(i) && outside) cell(context, i);
+      }
+    }
+  };
+
+  const groups = {
+    buildingZone: layer(paintMask(decode(masks.buildingZone), "rgba(120, 225, 140, 0.26)", { edge: "rgba(140, 240, 160, 0.95)" })),
+    setbacks: layer(paintMask(decode(masks.setbacks), "rgba(15, 20, 18, 0.38)", { hatch: "rgba(255, 255, 255, 0.7)" })),
+    overlandFlow: layer(paintMask(decode(masks.overlandFlow), "rgba(70, 140, 245, 0.38)", { edge: "rgba(130, 185, 255, 0.9)" })),
+    floodBuffer: layer(paintMask(decode(masks.floodBuffer), "rgba(90, 120, 225, 0.12)", { hatch: "rgba(140, 170, 255, 0.55)" })),
+    landslide: layer((context) => {
+      paintMask(decode(masks.landslideModerate), "rgba(240, 175, 70, 0.26)")(context);
+      paintMask(decode(masks.landslideHigh), "rgba(230, 75, 55, 0.42)", { edge: "rgba(255, 110, 90, 0.9)" })(context);
+    }),
+    bushfire: layer(paintMask(decode(masks.bushfireBuffer), "rgba(255, 125, 45, 0.3)", { edge: "rgba(255, 150, 80, 0.9)" })),
+    slope: layer((context) => {
+      const classes = decode(slopeClasses);
+      const colors = [null, "rgba(80, 190, 110, 0.6)", "rgba(180, 215, 100, 0.6)", "rgba(240, 210, 90, 0.6)", "rgba(240, 150, 75, 0.6)", "rgba(225, 85, 70, 0.6)"];
+      for (let i = 0; i < count; i++) if (classes[i]) { context.fillStyle = colors[classes[i]]; cell(context, i); }
+    }),
+  };
+
+  // The mapped stream is drawn with the overland flow layer, where it crosses the lot.
+  const points = [];
+  stream.forEach(([ax, az], i) => {
+    if (i === stream.length - 1) return;
+    const [bx, bz] = stream[i + 1];
+    const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az)));
+    for (let k = 0; k <= steps; k++) {
+      const x = ax + (bx - ax) * k / steps, z = az + (bz - az) * k / steps;
+      if (insidePolygon(x, z, data.boundary)) points.push(new THREE.Vector3(x, groundHeight(x, z) + 0.4, z));
+    }
+  });
+  groups.overlandFlow.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: "#6fb4ff" })));
+  return groups;
+}
+
 const photoWidth = 1384, photoHeight = 952, photoCropY = 15;
 
 function applyProjective(matrix, x, y) {
@@ -564,6 +656,7 @@ function makeAerialPhoto({ file, toSite, terrainGeometry, ground, buttonId }) {
 
 function toggle(buttonId, group) {
   const button = document.getElementById(buttonId);
+  group.visible = button.getAttribute("aria-pressed") === "true";
   button.addEventListener("click", () => {
     group.visible = !group.visible;
     button.setAttribute("aria-pressed", String(group.visible));
@@ -609,6 +702,7 @@ try {
   makePad(data, sampleHeight);
   makeRoadContext(data, ground.height);
   makeEasements(data, ground.height);
+  const constraints = makeConstraints(data, terrainGeometry, ground.height);
   const parcelPoints = data.boundary.map(([x, , z]) => [x, z]);
   const photos = [
     makeAerialPhoto({ file: "./aerial-reference-close.jpg", toSite: affineFromPairs([[308, 416], [523, 648], [1039, 400]], parcelPoints), terrainGeometry, ground, buttonId: "aerial-closeup-toggle" }),
@@ -624,6 +718,13 @@ try {
   toggle("road-toggle", roadGroup);
   toggle("easement-toggle", easementGroup);
   toggle("boundary-toggle", boundaryGroup);
+  toggle("zone-toggle", constraints.buildingZone);
+  toggle("setback-toggle", constraints.setbacks);
+  toggle("slope-toggle", constraints.slope);
+  toggle("flow-toggle", constraints.overlandFlow);
+  toggle("flood-toggle", constraints.floodBuffer);
+  toggle("landslide-toggle", constraints.landslide);
+  toggle("bushfire-toggle", constraints.bushfire);
   document.getElementById("elevation-range").innerHTML = `${data.elevationRangeM[0].toFixed(1)}–${data.elevationRangeM[1].toFixed(1)} <span class="unit">m</span>`;
   fit();
   const homeTarget = new THREE.Vector3(0, (data.elevationRangeM[0] + data.elevationRangeM[1]) / 2, 0);
