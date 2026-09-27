@@ -770,7 +770,7 @@ try {
     viewpointBar.querySelectorAll("button").forEach((button) => button.addEventListener("click", () => stepInside(views[Number(button.dataset.index)])));
   };
   // Eye-level view inside a concept: a wide lens, a near clipping plane, and orbiting around a point
-  // just ahead, so dragging looks around. Reset and Top view restore the site camera.
+  // just ahead, so dragging looks around. Top view and 3D view restore the site camera.
   // Site-scale markers (boundary line, easement labels) draw through walls, so hide them inside.
   const siteMarkers = [boundaryGroup, easementGroup];
   let hiddenMarkers = null;
@@ -883,6 +883,8 @@ try {
   };
   document.getElementById("reset").addEventListener("click", goHome);
   document.getElementById("top-view").addEventListener("click", goTop);
+  // Open on the north-up plan; the 3D view is one click away.
+  goTop();
   window.addEventListener("resize", fit);
   loading.hidden = true;
   renderer.setAnimationLoop(() => {
